@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project basedir="." default="build" name="umsp-core">
+    <property environment="env"/>
+    <property name="debuglevel" value="source,lines,vars"/>
+    <property name="target" value="1.5"/>
+    <property name="source" value="1.5"/>
+	<property name="src.dir" value="${basedir}/src"/>
+	<property name="target.dir" value="${basedir}/build/classes"/>
+	<property name="dist.dir" value="${basedir}/build"/>
+	<property name="encoding" value="utf-8"/>
+	<property name="jarfile" value="umsp-core.jar"/>
+	<property name="zipfile" value="umsp-core.zip"/>
+	<property name="zipdocfile" value="umsp-core-docs.zip"/>
+	<property name="jarfile.test" value="umsp-core-test.jar"/>
+	<property name="jarfile.sources" value="umsp-core-sources.jar"/>
+	<property name="apidoc.dir" value="${dist.dir}/apidoc"/>
+    <path id="umsp-core.classpath">
+		<pathelement location="${target.dir}"/>
+    	<pathelement location="${basedir}/../depends/dits/dits-utils.jar"/>
+    	<pathelement location="${basedir}/../depends/spring/3.1.2/org.springframework.beans-3.1.2.RELEASE.jar"/>
+    	<pathelement location="${basedir}/../depends/spring/3.1.2/org.springframework.context-3.1.2.RELEASE.jar"/>
+    	<pathelement location="${basedir}/../depends/spring/3.1.2/org.springframework.core-3.1.2.RELEASE.jar"/>
+       	<pathelement location="${basedir}/../depends/log/commons-logging.jar"/>
+    </path>
+	<path id="umsp-core.test.classpath">
+		<path refid="umsp-core.classpath"/>
+		<pathelement location="${basedir}/../dits-depends/test/testng.jar"/>
+		<pathelement location="${basedir}/../dits-depends/test/junit.jar"/>
+	</path>
+    <target name="init">
+    	<mkdir dir="${target.dir}"/>
+        <copy includeemptydirs="false" todir="${target.dir}">
+            <fileset dir="${basedir}/src">
+                <exclude name="**/*.launch"/>
+                <exclude name="**/*.java"/>
+            </fileset>
+        </copy>
+    </target>
+    <target name="clean">
+        <delete dir="${target.dir}"/>
+        <delete dir="${dist.dir}"/>
+    </target>
+    <target depends="clean" name="cleanall"/>
+    <target depends="build-subprojects,build-project" name="build"/>
+    <target name="build-subprojects"/>
+    <target depends="init" name="build-project">
+        <echo message="${ant.project.name}: ${ant.file}"/>
+        <javac debug="true" debuglevel="${debuglevel}" destdir="${target.dir}" source="${source}" target="${target}" encoding="${encoding}" includeantruntime="true" includejavaruntime="true">
+            <src path="${basedir}/src"/>
+            <classpath refid="umsp-core.classpath"/>
+        </javac>
+    </target>
+	<target depends="build" name="dist">
+		<jar destfile="${basedir}/build/${jarfile}" manifest="${basedir}/src/META-INF/MANIFEST.MF" manifestencoding="${encoding}">
+			<fileset dir="${basedir}/build/classes"/>
+		</jar>
+		<copy file="${basedir}/build/${jarfile}" todir="${basedir}/../depends/umsp" overwrite="true"/>
+	</target>
+	<target depends="cleanall,build"  name="rebuild"/>
+	<target depends="cleanall,dist"  name="redist"/>
+
+	<!-- 测试部分 -->
+	<target depends="init" name="init-test">
+		<copy includeemptydirs="false" todir="${target.dir}">
+			<fileset dir="${basedir}/test">
+				<exclude name="**/*.launch"/>
+				<exclude name="**/*.java"/>
+			</fileset>
+		</copy>
+	</target>
+
+	<target depends="init-test,build" name="build-test">
+		<echo message="Building test classes..."/>
+		<javac debug="true" debuglevel="${debuglevel}" destdir="${target.dir}" source="${source}" target="${target}" encoding="${encoding}" includeantruntime="true" includejavaruntime="true">
+			<src path="${basedir}/test"/>
+			<classpath refid="umsp-core.test.classpath"/>
+		</javac>
+	</target>
+	<taskdef name="testng"  classname="org.testng.TestNGAntTask" classpathref="umsp-core.test.classpath"/>
+	<target name="test" depends="cleanall, build-test">
+		<jar destfile="${dist.dir}/${jarfile.test}" manifest="${basedir}/src/META-INF/MANIFEST.MF" manifestencoding="${encoding}">
+			<fileset dir="${basedir}/build/classes"/>
+		</jar>
+		<testng workingdir="${dist.dir}/testng" testjar="${dist.dir}/${jarfile.test}"  classpathref="umsp-core.test.classpath" outputdir="${dist.dir}/testng"/>
+	</target>
+
+	<!-- API文档 -->
+	<target depends="init" name="apidoc">
+			<delete dir="${apidoc.dir}"/>
+			<javadoc destdir="${apidoc.dir}" encoding="utf-8" docencoding="utf-8" failonerror="false">
+				<packageset dir="${src.dir}"/>
+					<doctitle>
+						<![CDATA[<h1>umsp-core API</h1>]]>
+					</doctitle>
+					<bottom>
+						<![CDATA[<i>Document by AUTO Generator.</i>]]>
+					</bottom>
+			</javadoc>
+			<property name="tar.dir" value="${dist.dir}/tar"/>
+			<mkdir dir="${tar.dir}"/>
+			<copy todir="${tar.dir}/reference" failonerror="false">
+				<fileset dir="${basedir}/doc">
+					<include name="*.pdf"/>
+				</fileset>
+			</copy>
+			<copy todir="${tar.dir}/javadoc-api">
+				<fileset dir="${apidoc.dir}"/>
+			</copy>
+			<zip destfile="${dist.dir}/${zipdocfile}" basedir="${tar.dir}"/>
+			<delete dir="${tar.dir}"/>
+		</target>
+	
+	<!-- 源代码打包 -->
+	<target depends="cleanall, init, apidoc" name="tar">
+		<property name="tar.dir" value="${dist.dir}/tar"/>
+		<mkdir dir="${tar.dir}"/>
+		<copy todir="${tar.dir}/src">
+			<fileset dir="${src.dir}"/>
+		</copy>
+		<copy todir="${tar.dir}/test" failonerror="false">
+			<fileset dir="${basedir}/test"/>
+		</copy>
+		<copy todir="${tar.dir}/libs">
+			<fileset dir="${basedir}/libs"/>
+		</copy>
+		<copy todir="${tar.dir}/doc" failonerror="false">
+			<fileset dir="${basedir}/doc">
+				<include name="*.pdf"/>
+			</fileset>
+		</copy>
+		<copy file="build.xml" todir="${tar.dir}" failonerror="false"/>
+		<copy file="README" todir="${tar.dir}" failonerror="false"/>
+		<copy todir="${tar.dir}/doc/apidoc" failonerror="false">
+			<fileset dir="${apidoc.dir}"/>
+		</copy>
+		<zip destfile="${dist.dir}/${zipfile}" basedir="${tar.dir}"/>
+		<delete dir="${tar.dir}"/>
+	</target>
+
+	<!-- 打包源代码 -->
+	<target name="sources">
+		<delete dir="${dist.dir}/sources"/>
+		<mkdir dir="${dist.dir}/sources"/>
+		<copy includeemptydirs="false" todir="${dist.dir}/sources">
+			<fileset dir="${basedir}/src"/>
+		</copy>
+		<jar destfile="${basedir}/build/${jarfile.sources}" manifest="${basedir}/src/META-INF/MANIFEST.MF" manifestencoding="${encoding}">
+			<fileset dir="${dist.dir}/sources"/>
+		</jar>
+		<delete dir="${dist.dir}/sources"/>
+	</target>
+	
+	<!-- eclipse 3.6  -->
+	<target name="eclipse3.6" description="Apply template Eclipse settings">
+		<copy todir="${basedir}/.settings" overwrite="true">
+			<fileset dir="${basedir}/tools/files/eclipse3.6/eclipse.settings"/>
+		</copy>
+		<copy file="${basedir}/tools/files/eclipse3.6/eclipse.classpath" tofile="${basedir}/.classpath" overwrite="true"/>
+		<copy file="${basedir}/tools/files/eclipse3.6/eclipse.project" tofile="${basedir}/.project" overwrite="true"/>
+	</target>
+	
+</project>
