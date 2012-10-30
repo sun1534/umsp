@@ -146,10 +146,11 @@ public class CmppContextSPSHandler extends CmppContextSPHandler {
 		for (Submit sb : takedPostSubmits) {
 			sb.spId = "" + this.enterpriseId;
 			sb.sourceId = "" + this.spNumber;
-			sb.nodeId = 0;//this.enterpriseId;
-			sb.nodeTime = 0;//CalendarUtils.getTimestampInYearDuring(sb.createTimeMillis);
-			sb.nodeSeq = 0;//
+			sb.nodeId = this.enterpriseId;
+			sb.nodeTime = CalendarUtils.getTimestampInYearDuring(sb.createTimeMillis);
 			sb.sequenceId = request.generateSequence();
+			sb.nodeSeq = sb.sequenceId;
+			
 			for (int j = 0; j < ListUtils.size(postSubmitListener); j++) {
 				PostSubmitListener evnListener = (PostSubmitListener) ListUtils.get(postSubmitListener, j);
 				try {
