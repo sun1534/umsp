@@ -11,6 +11,8 @@ public class DeliverResponse extends CmppDataPacket {
 	public int nodeId;
 	
 	public int nodeTime;
+	
+	public int nodeSeq;
 
 	public int result;
 
@@ -19,7 +21,7 @@ public class DeliverResponse extends CmppDataPacket {
 	}
 
 	public long getMsgId() {
-		return CmppUtils.generateMsgID(this.nodeId, this.nodeTime, this.sequenceId);
+		return CmppUtils.generateMsgID(this.nodeId, this.nodeTime, this.nodeSeq);
 	}
 	
 	@Override
@@ -35,6 +37,7 @@ public class DeliverResponse extends CmppDataPacket {
 		long tmp_msgid = in.readLong();
 		this.nodeId = CmppUtils.getNodeIdFromMsgID(tmp_msgid);
 		this.nodeTime = CmppUtils.getNodeTimeFromMsgID(tmp_msgid);
+		this.nodeSeq  = CmppUtils.getSequenceIdFromMsgID(tmp_msgid);
 		this.result = in.readInt();
 	}
 

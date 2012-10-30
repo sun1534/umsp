@@ -25,6 +25,8 @@ public class Deliver extends CmppDataPacket {
 	public int nodeId;
 
 	public int nodeTime;
+	
+	public int nodeSeq;
 
 	public String destId; // 21 Octet String 目的号码。
 							// SP的服务代码，一般4--6位，或者是前缀为服务代码的长号码；该号码是手机用户短消息的被叫号码。
@@ -58,7 +60,7 @@ public class Deliver extends CmppDataPacket {
 	}
 
 	public long getMsgId() {
-		return CmppUtils.generateMsgID(this.nodeId, this.nodeTime, this.sequenceId);
+		return CmppUtils.generateMsgID(this.nodeId, this.nodeTime, this.nodeSeq);
 	}
 
 	@Override
@@ -100,6 +102,7 @@ public class Deliver extends CmppDataPacket {
 
 		this.nodeId = CmppUtils.getNodeIdFromMsgID(temp_msg_id);
 		this.nodeTime = CmppUtils.getNodeTimeFromMsgID(temp_msg_id);
+		this.nodeSeq = CmppUtils.getSequenceIdFromMsgID(temp_msg_id);
 
 		this.destId = readFixedString(in, 21);
 		this.serviceId = readFixedString(in, 10);

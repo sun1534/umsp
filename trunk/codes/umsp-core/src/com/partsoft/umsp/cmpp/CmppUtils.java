@@ -19,7 +19,7 @@ import com.partsoft.utils.RandomUtils;
 public abstract class CmppUtils {
 
 	public static void main(String[] args) {
-		long msgId = generateMsgID(1, 1028183612, 2);
+		long msgId = generateMsgID(0, 0, 0);
 		System.out.println(msgId);
 		System.out.println(getNodeTimeFromMsgID(msgId));
 		System.out.println(getNodeIdFromMsgID(msgId));

@@ -146,8 +146,9 @@ public class CmppContextSPSHandler extends CmppContextSPHandler {
 		for (Submit sb : takedPostSubmits) {
 			sb.spId = "" + this.enterpriseId;
 			sb.sourceId = "" + this.spNumber;
-			sb.nodeId = this.enterpriseId;
-			sb.nodeTime = CalendarUtils.getTimestampInYearDuring(sb.createTimeMillis);
+			sb.nodeId = 0;//this.enterpriseId;
+			sb.nodeTime = 0;//CalendarUtils.getTimestampInYearDuring(sb.createTimeMillis);
+			sb.nodeSeq = 0;//
 			sb.sequenceId = request.generateSequence();
 			for (int j = 0; j < ListUtils.size(postSubmitListener); j++) {
 				PostSubmitListener evnListener = (PostSubmitListener) ListUtils.get(postSubmitListener, j);
@@ -188,8 +189,12 @@ public class CmppContextSPSHandler extends CmppContextSPHandler {
 		}
 		DeliverResponse deliver_response = new DeliverResponse();
 		deliver_response.sequenceId = deliver_packet.sequenceId;
+		
+		//构建msgid
 		deliver_response.nodeId = deliver_packet.nodeId;
 		deliver_response.nodeTime = deliver_packet.nodeTime;
+		deliver_response.nodeSeq = deliver_packet.nodeSeq;
+		
 		deliver_response.result = 0;
 		response.flushDataPacket(deliver_response);
 	}

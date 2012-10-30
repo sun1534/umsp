@@ -21,6 +21,8 @@ public class Submit extends CmppDataPacket {
 	public int nodeId; // nodeId 与 nodeTime 组合生成MsgId: 8 Unsigned Integer 信息标识。
 
 	public int nodeTime;// nodeId 与 nodeTime 组合生成MsgId: 8 Unsigned Integer 信息标识。
+	
+	public int nodeSeq;//
 
 	public int pkTotal; // 1 Unsigned Integer 相同Msg_Id的信息总条数，从1开始。
 
@@ -84,13 +86,13 @@ public class Submit extends CmppDataPacket {
 	}
 
 	public long getMsgId() {
-		return CmppUtils.generateMsgID(this.nodeId, this.nodeTime, this.sequenceId);
+		return CmppUtils.generateMsgID(this.nodeId, this.nodeTime, this.nodeSeq);
 	}
 
 	@Override
 	protected void writeDataOutput(DataOutput out) throws IOException {
 		super.writeDataOutput(out);
-		//out.writeLong(getMsgId());
+		out.writeLong(getMsgId());
 		//输出时为空
 		out.write(new byte[Buffer.LONG_SIZE]);
 		out.writeByte(pkTotal);
@@ -149,6 +151,7 @@ public class Submit extends CmppDataPacket {
 		long temp_msgid = in.readLong();
 		nodeId = CmppUtils.getNodeIdFromMsgID(temp_msgid);
 		nodeTime = CmppUtils.getNodeTimeFromMsgID(temp_msgid);
+		nodeSeq = CmppUtils.getSequenceIdFromMsgID(temp_msgid);
 
 		pkTotal = in.readByte();
 		pkNumber = in.readByte();
