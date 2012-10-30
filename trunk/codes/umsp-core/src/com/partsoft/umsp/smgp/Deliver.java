@@ -131,7 +131,7 @@ public class Deliver extends SmgpTlvDataPacket {
 	}
 	
 	public byte getTp_udhi() {
-		return this.hasDynamicProperty(TlvTags.TP_udhi) ? 0 : getDynamicProperty(TlvTags.TP_udhi)[0];
+		return this.hasDynamicProperty(TlvTags.TP_udhi) ? getDynamicProperty(TlvTags.TP_udhi)[0] : 0;
 	}
 	
 	public void setTp_udhi(byte value) {

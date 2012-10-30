@@ -112,7 +112,7 @@ public class Submit extends SmgpTlvDataPacket {
 		in.readFully(MsgContent, 0, MsgLength);
 		Reserve = readFixedString(in, 8);
 		readTlvDatas(in);
-		tp_udhi = this.hasDynamicProperty(TlvTags.TP_udhi) ? 0 : getDynamicProperty(TlvTags.TP_udhi)[0];
+		tp_udhi = this.hasDynamicProperty(TlvTags.TP_udhi) ? getDynamicProperty(TlvTags.TP_udhi)[0] : 0;
 	}
 
 	@Override
