@@ -3,6 +3,7 @@ package com.partsoft.umsp.cmpp;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.util.Arrays;
 
 import com.partsoft.umsp.Constants.MessageCodes;
 import com.partsoft.umsp.cmpp.Constants.Commands;
@@ -25,7 +26,7 @@ public class Deliver extends CmppDataPacket {
 	public int nodeId;
 
 	public int nodeTime;
-	
+
 	public int nodeSeq;
 
 	public String destId; // 21 Octet String 目的号码。
@@ -141,7 +142,7 @@ public class Deliver extends CmppDataPacket {
 		}
 		return result;
 	}
-	
+
 	public String getMessageContent() {
 		return tp_udhi == 1 ? UmspUtils.fromGsmBytes(msgContent, 6, msgLength - 6, msgFormat) : UmspUtils.fromGsmBytes(
 				msgContent, msgFormat);
@@ -181,11 +182,20 @@ public class Deliver extends CmppDataPacket {
 		}
 		return result & 0xFF;
 	}
-		
 
 	@Override
 	public Deliver clone() {
 		return (Deliver) super.clone();
+	}
+
+	@Override
+	public String toString() {
+		return "Deliver [nodeId=" + nodeId + ", nodeTime=" + nodeTime + ", nodeSeq=" + nodeSeq + ", destId=" + destId
+				+ ", serviceId=" + serviceId + ", tp_pid=" + tp_pid + ", tp_udhi=" + tp_udhi + ", msgFormat="
+				+ msgFormat + ", sourceId=" + sourceId + ", sourceType=" + sourceType + ", registeredDelivery="
+				+ registeredDelivery + ", msgLength=" + msgLength + ", msgContent=" + Arrays.toString(msgContent)
+				+ ", linkId=" + linkId + ", commandId=" + commandId + ", sequenceId=" + sequenceId
+				+ ", protocolVersion=" + protocolVersion + "]";
 	}
 
 }

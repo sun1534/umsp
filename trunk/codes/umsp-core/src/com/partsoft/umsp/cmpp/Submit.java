@@ -4,12 +4,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashSet;
 
 import com.partsoft.umsp.Constants.MessageCodes;
 import com.partsoft.umsp.Constants.SMS;
 import com.partsoft.umsp.cmpp.Constants.Commands;
-import com.partsoft.umsp.io.Buffer;
 import com.partsoft.umsp.io.ByteArrayBuffer;
 import com.partsoft.umsp.packet.PacketOutputStream;
 import com.partsoft.umsp.utils.UmspUtils;
@@ -21,7 +21,7 @@ public class Submit extends CmppDataPacket {
 	public int nodeId; // nodeId 与 nodeTime 组合生成MsgId: 8 Unsigned Integer 信息标识。
 
 	public int nodeTime;// nodeId 与 nodeTime 组合生成MsgId: 8 Unsigned Integer 信息标识。
-	
+
 	public int nodeSeq;//
 
 	public int pkTotal; // 1 Unsigned Integer 相同Msg_Id的信息总条数，从1开始。
@@ -93,8 +93,6 @@ public class Submit extends CmppDataPacket {
 	protected void writeDataOutput(DataOutput out) throws IOException {
 		super.writeDataOutput(out);
 		out.writeLong(getMsgId());
-		//输出时为空
-		out.write(new byte[Buffer.LONG_SIZE]);
 		out.writeByte(pkTotal);
 		out.writeByte(pkNumber);
 		out.writeByte(registeredDelivery);
@@ -214,7 +212,7 @@ public class Submit extends CmppDataPacket {
 		}
 		return result;
 	}
-	
+
 	public void setMessageContent(String msg, int code) {
 		msgFormat = (byte) code;
 		msgContent = UmspUtils.toGsmBytes(msg, code);
@@ -234,7 +232,7 @@ public class Submit extends CmppDataPacket {
 			destTerminalIds = (String[]) ListUtils.addToArray(destTerminalIds, userNumber, String.class);
 		}
 	}
-	
+
 	public void setUserNumbers(String value) {
 		if (StringUtils.hasText(value)) {
 			if (value.indexOf(',') >= 0) {
@@ -310,13 +308,26 @@ public class Submit extends CmppDataPacket {
 		this.msgLength = byte_buffer.length();
 		this.msgContent = byte_buffer.array();
 	}
-		
 
 	@Override
 	public Submit clone() {
 		return (Submit) super.clone();
 	}
-	
+
+	@Override
+	public String toString() {
+		return "Submit [nodeId=" + nodeId + ", nodeTime=" + nodeTime + ", nodeSeq=" + nodeSeq + ", pkTotal=" + pkTotal
+				+ ", pkNumber=" + pkNumber + ", registeredDelivery=" + registeredDelivery + ", msgLevel=" + msgLevel
+				+ ", serviceId=" + serviceId + ", feeUserType=" + feeUserType + ", feeTerminalId=" + feeTerminalId
+				+ ", feeTerminalType=" + feeTerminalType + ", tp_pid=" + tp_pid + ", tp_udhi=" + tp_udhi
+				+ ", msgFormat=" + msgFormat + ", spId=" + spId + ", feeType=" + feeType + ", feeCode=" + feeCode
+				+ ", expireTime=" + expireTime + ", atTime=" + atTime + ", sourceId=" + sourceId + ", destUserCount="
+				+ destUserCount + ", destTerminalIds=" + Arrays.toString(destTerminalIds) + ", destTerminalType="
+				+ destTerminalType + ", msgLength=" + msgLength + ", msgContent=" + Arrays.toString(msgContent)
+				+ ", linkId=" + linkId + ", commandId=" + commandId + ", sequenceId=" + sequenceId
+				+ ", getMessageContent()=" + getMessageContent() + "]";
+	}
+
 	public static void main(String[] args) {
 		Submit sb = new Submit();
 		sb.setUserNumbers("13317312768");

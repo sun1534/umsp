@@ -8,8 +8,6 @@ import com.partsoft.umsp.cmpp.Constants.Commands;
 
 public class SubmitResponse extends CmppDataPacket {
 
-	public long message_id;
-	
 	public int nodeId;
 	
 	public int nodeTime;
@@ -21,11 +19,15 @@ public class SubmitResponse extends CmppDataPacket {
 	public SubmitResponse() {
 		super(Commands.CMPP_SUBMIT_RESP);
 	}
+	
+	public long getMsgId() {
+		return CmppUtils.generateMsgID(this.nodeId, this.nodeTime, this.nodeSeq);
+	}
 
 	@Override
 	protected void writeDataOutput(DataOutput out) throws IOException {
 		super.writeDataOutput(out);
-		out.writeLong(this.message_id);
+		out.writeLong(getMsgId());
 		if (protocolVersion == Constants.VERSION3) {
 			out.writeInt(this.result);
 		} else {
@@ -36,8 +38,7 @@ public class SubmitResponse extends CmppDataPacket {
 	@Override
 	protected void readDataInput(DataInput in) throws IOException {
 		super.readDataInput(in);
-		this.message_id = in.readLong();
-		long temp_msgid = message_id;
+		long temp_msgid = in.readLong();
 		
 		nodeId = CmppUtils.getNodeIdFromMsgID(temp_msgid);
 		nodeTime = CmppUtils.getNodeTimeFromMsgID(temp_msgid);
@@ -68,7 +69,7 @@ public class SubmitResponse extends CmppDataPacket {
 
 	@Override
 	public String toString() {
-		return "SubmitResponse [message_id=" + message_id + ", nodeId=" + nodeId + ", nodeTime=" + nodeTime
+		return "SubmitResponse [nodeId=" + nodeId + ", nodeTime=" + nodeTime
 				+ ", nodeSeq=" + nodeSeq + ", result=" + result + ", sequenceId=" + sequenceId + ", createTimeMillis="
 				+ createTimeMillis + ", protocolVersion=" + protocolVersion + "]";
 	}
