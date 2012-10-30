@@ -37,7 +37,7 @@ public abstract class SmgpDataPacket extends AbstractDataPacket implements DataP
 		out.writeInt(requestId);
 		out.writeInt(sequenceId);
 		if (Log.isDebugEnabled()) {
-			Log.debug(String.format("%s writeDataOut()", getClass().getName()));
+			Log.debug(String.format("%s writeDataOut()%s", getClass().getName(), this.toString()));
 		}
 	}
 

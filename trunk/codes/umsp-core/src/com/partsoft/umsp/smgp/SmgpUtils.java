@@ -14,9 +14,16 @@ import com.partsoft.umsp.io.ByteArrayBuffer;
 import com.partsoft.umsp.smgp.Constants.TlvTags;
 import com.partsoft.umsp.utils.UmspUtils;
 import com.partsoft.utils.Assert;
+import com.partsoft.utils.HexUtils;
 import com.partsoft.utils.RandomUtils;
 
 public abstract class SmgpUtils {
+	
+	public static void main(String[] args) {
+		byte bytes[] = HexUtils.bytesFromHex("73106210301608267738");
+		System.out.println("" + UmspUtils.fromBcdBytes(bytes, 3, 4));
+		
+	}
 
 	public static byte[] generateMsgID(int node_id, int create_time, int seq) {
 		byte[] node_id_bytes = UmspUtils.toBcdBytes(node_id);

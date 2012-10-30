@@ -17,7 +17,9 @@ public class Deliver extends SmgpTlvDataPacket {
 	public int NodeId;
 
 	public int NodeTime;
-
+	
+	public int NodeSequenceId;
+	
 	// public String MsgID;// 10 Integer 网关产生的短消息流水号，由三部分组成：
 	// 网关代码：3字节（BCD码）
 	// 时间：4字节（BCD码）MMDDHHMM（月日时分）
@@ -45,7 +47,7 @@ public class Deliver extends SmgpTlvDataPacket {
 	}
 
 	public byte[] getMsgID() {
-		return SmgpUtils.generateMsgID(NodeId, NodeTime, sequenceId);
+		return SmgpUtils.generateMsgID(NodeId, NodeTime, NodeSequenceId);
 	}
 
 	@Override
@@ -76,7 +78,7 @@ public class Deliver extends SmgpTlvDataPacket {
 		index += 3;
 		NodeTime = HexUtils.intFromHex(HexUtils.toHex(msg_id_bytes, index, 4));
 		index += 4;
-		sequenceId = HexUtils.intFromHex(HexUtils.toHex(msg_id_bytes, index, 3));
+		NodeSequenceId = HexUtils.intFromHex(HexUtils.toHex(msg_id_bytes, index, 3));
 
 		IsReport = in.readByte();
 		MsgFormat = in.readByte();

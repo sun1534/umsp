@@ -195,8 +195,12 @@ public class SmgpContextSPSHandler extends SmgpContextSPHandler {
 		}
 		DeliverResponse deliver_response = new DeliverResponse();
 		deliver_response.sequenceId = deliver_packet.sequenceId;
+		
+		//设置MSGID
 		deliver_response.NodeId = deliver_packet.NodeId;
 		deliver_response.NodeTime = deliver_packet.NodeTime;
+		deliver_response.NodeSequenceId = deliver_packet.NodeSequenceId;
+		
 		deliver_response.Status = StatusCodes.ERR_SUCCESS;
 		response.flushDataPacket(deliver_response);
 	}

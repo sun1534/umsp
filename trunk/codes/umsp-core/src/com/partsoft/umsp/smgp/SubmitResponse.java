@@ -13,6 +13,8 @@ public class SubmitResponse extends SmgpDataPacket {
 	
 	public int NodeTime;
 	
+	public int NodeSequenceId;
+	
 	// 网关代码：3字节（BCD码）
 	// 时间：4字节（BCD码）
 	// 序列号：3字节（BCD码）
@@ -24,7 +26,7 @@ public class SubmitResponse extends SmgpDataPacket {
 	}
 	
 	public byte[] getMsgID() {
-		return SmgpUtils.generateMsgID(NodeId, NodeTime, sequenceId);
+		return SmgpUtils.generateMsgID(NodeId, NodeTime, NodeSequenceId);
 	}
 	
 	@Override
@@ -44,7 +46,7 @@ public class SubmitResponse extends SmgpDataPacket {
 		index += 3;
 		NodeTime = HexUtils.intFromHex(HexUtils.toHex(msg_id_bytes, index, 4));
 		index += 4;
-		sequenceId = HexUtils.intFromHex(HexUtils.toHex(msg_id_bytes, index, 3));
+		NodeSequenceId = HexUtils.intFromHex(HexUtils.toHex(msg_id_bytes, index, 3));
 		Status = in.readInt();
 	}
 	
