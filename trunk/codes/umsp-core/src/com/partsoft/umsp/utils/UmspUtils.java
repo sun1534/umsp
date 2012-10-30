@@ -3,9 +3,31 @@ package com.partsoft.umsp.utils;
 import java.io.UnsupportedEncodingException;
 
 import com.partsoft.umsp.Constants.MessageCodes;
+import com.partsoft.umsp.io.ByteArrayBuffer;
 import com.partsoft.utils.StringUtils;
 
 public class UmspUtils {
+
+	public static byte[] string2FixedBytes(String s, int fixLength) {
+		ByteArrayBuffer resultBuffer = new ByteArrayBuffer(fixLength);
+		byte sBytes[] = s == null ? new byte[0] : new byte[s.length()];
+		int byLen = sBytes.length;
+		for (int i = 0; i < byLen; i++) {
+			sBytes[i] = (byte) s.charAt(i);
+		}
+		int fixZero = 0;
+		if (byLen > fixLength) {
+			byLen = fixLength;
+		} else if (byLen < fixLength) {
+			fixZero = fixLength - byLen;
+		}
+		resultBuffer.put(sBytes);
+
+		for (; fixZero > 0; fixZero--) {
+			resultBuffer.put((byte)0);
+		}
+		return resultBuffer.array();
+	}
 
 	public static int fromBcdBytes(byte[] bcdBytes, int index, int length) {
 		StringBuffer temp = new StringBuffer(length * 2);
@@ -31,13 +53,14 @@ public class UmspUtils {
 		return result;
 	}
 
+	public static byte[] toGsmBytes(String msg) {
+		return toGsmBytes(msg, MessageCodes.ASCII);
+	}
+
 	public static byte[] toGsmBytes(String msg, int code) {
 		byte result[] = null;
 		if (msg != null) {
 			switch (code) {
-			case MessageCodes.BYTES:
-				result = msg.getBytes();
-				break;
 			case MessageCodes.UCS2:
 				result = StringUtils.toUCS2Bytes(msg);
 				break;
@@ -49,20 +72,28 @@ public class UmspUtils {
 				}
 				break;
 			default:
-				result = msg.getBytes();
+				result = new byte[msg.length()];
+				for (int i = 0; i < result.length; i++) {
+					result[i] = (byte) msg.charAt(i);
+				}
 				break;
 			}
 		}
 		return result;
 	}
 
+	public static String fromGsmBytes(byte[] msg) {
+		return fromGsmBytes(msg, 0, msg == null ? 0 : msg.length, MessageCodes.ASCII);
+	}
+
+	public static String fromGsmBytes(byte[] msg, int index, int length) {
+		return fromGsmBytes(msg, index, length, MessageCodes.ASCII);
+	}
+
 	public static String fromGsmBytes(byte[] msg, int index, int length, int code) {
 		String result = null;
 		if (msg != null) {
 			switch (code) {
-			case MessageCodes.BYTES:
-				result = new String(msg, index, length);
-				break;
 			case MessageCodes.UCS2:
 				result = StringUtils.fromUCS2Bytes(msg, index, length);
 				break;
@@ -74,7 +105,11 @@ public class UmspUtils {
 				}
 				break;
 			default:
-				result = new String(msg, index, length);
+				char msg_chars[] = new char[msg.length];
+				for (int i = 0; i < msg.length; i++) {
+					msg_chars[i] = (char) msg[i];
+				}
+				result = new String(msg_chars, index, length);
 				break;
 			}
 		}

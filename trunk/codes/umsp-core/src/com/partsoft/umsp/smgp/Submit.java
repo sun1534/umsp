@@ -139,7 +139,7 @@ public class Submit extends SmgpTlvDataPacket {
 			DestTermID = (String[]) ListUtils.addToArray(DestTermID, userNumber, String.class);
 		}
 	}
-	
+
 	public void setUserNumbers(String value) {
 		if (StringUtils.hasText(value)) {
 			if (value.indexOf(',') >= 0) {
@@ -215,7 +215,144 @@ public class Submit extends SmgpTlvDataPacket {
 		this.MsgLength = byte_buffer.length();
 		this.MsgContent = byte_buffer.array();
 	}
-	
+
+	public byte getTp_pid() {
+		return this.hasDynamicProperty(TlvTags.TP_udhi) ? getDynamicProperty(TlvTags.TP_udhi)[0] : 0;
+	}
+
+	public void setTp_pid(byte value) {
+		setDynamicProperty(TlvTags.TP_udhi, new byte[] { value });
+	}
+
+	public byte getTp_udhi() {
+		return this.hasDynamicProperty(TlvTags.TP_udhi) ? getDynamicProperty(TlvTags.TP_udhi)[0] : 0;
+	}
+
+	public void setTp_udhi(byte value) {
+		setDynamicProperty(TlvTags.TP_udhi, new byte[] { value });
+	}
+
+	public String getLinkId() {
+		return hasDynamicProperty(TlvTags.LinkID) ? UmspUtils.fromGsmBytes(getDynamicProperty(TlvTags.LinkID)) : "";
+	}
+
+	public void setLinkId(String linkId) {
+		if (StringUtils.hasLength(linkId)) {
+			setDynamicProperty(TlvTags.LinkID, UmspUtils.string2FixedBytes(linkId, 20));
+		} else {
+			removeDynamicProperty(TlvTags.LinkID);
+		}
+	}
+
+	public String getMsgSrc() {
+		return hasDynamicProperty(TlvTags.MsgSrc) ? UmspUtils.fromGsmBytes(getDynamicProperty(TlvTags.MsgSrc)) : "";
+	}
+
+	public void setMsgSrc(String linkId) {
+		if (StringUtils.hasLength(linkId)) {
+			setDynamicProperty(TlvTags.MsgSrc, UmspUtils.string2FixedBytes(linkId, 8));
+		} else {
+			removeDynamicProperty(TlvTags.MsgSrc);
+		}
+	}
+
+	public byte getChargeUserType() {
+		return this.hasDynamicProperty(TlvTags.ChargeUserType) ? getDynamicProperty(TlvTags.ChargeUserType)[0] : 0;
+	}
+
+	public void setChargeUserType(byte value) {
+		setDynamicProperty(TlvTags.ChargeUserType, new byte[] { value });
+	}
+
+	public byte getChargeTermType() {
+		return this.hasDynamicProperty(TlvTags.ChargeTermType) ? getDynamicProperty(TlvTags.ChargeTermType)[0] : 0;
+	}
+
+	public void setChargeTermType(byte value) {
+		setDynamicProperty(TlvTags.ChargeTermType, new byte[] { value });
+	}
+
+	public String getChargeTermPseudo() {
+		return hasDynamicProperty(TlvTags.ChargeTermPseudo) ? UmspUtils
+				.fromGsmBytes(getDynamicProperty(TlvTags.ChargeTermPseudo)) : "";
+	}
+
+	public void setChargeTermPseudo(String chargeTermPseudo) {
+		if (StringUtils.hasLength(chargeTermPseudo)) {
+			setDynamicProperty(TlvTags.ChargeTermPseudo,
+					UmspUtils.string2FixedBytes(chargeTermPseudo, chargeTermPseudo.length()));
+		} else {
+			removeDynamicProperty(TlvTags.ChargeTermPseudo);
+		}
+	}
+
+	public byte getDestTermTypeType() {
+		return this.hasDynamicProperty(TlvTags.DestTermType) ? getDynamicProperty(TlvTags.DestTermType)[0] : 0;
+	}
+
+	public void setDestTermType(byte value) {
+		setDynamicProperty(TlvTags.DestTermType, new byte[] { value });
+	}
+
+	public byte getPkTotal() {
+		return this.hasDynamicProperty(TlvTags.PkTotal) ? getDynamicProperty(TlvTags.PkTotal)[0] : 0;
+	}
+
+	public void setPkTotal(byte value) {
+		setDynamicProperty(TlvTags.PkTotal, new byte[] { value });
+	}
+
+	public byte getPkNumber() {
+		return this.hasDynamicProperty(TlvTags.PkNumber) ? getDynamicProperty(TlvTags.PkNumber)[0] : 0;
+	}
+
+	public void setPkNumber(byte value) {
+		setDynamicProperty(TlvTags.PkNumber, new byte[] { value });
+	}
+
+	public byte getSubmitMsgType() {
+		return this.hasDynamicProperty(TlvTags.SubmitMsgType) ? getDynamicProperty(TlvTags.SubmitMsgType)[0] : 0;
+	}
+
+	public void setSubmitMsgType(byte value) {
+		setDynamicProperty(TlvTags.SubmitMsgType, new byte[] { value });
+	}
+
+	public byte getSPDealResult() {
+		return this.hasDynamicProperty(TlvTags.SPDealReslt) ? getDynamicProperty(TlvTags.SPDealReslt)[0] : 0;
+	}
+
+	public void setSPDealResult(byte value) {
+		setDynamicProperty(TlvTags.SPDealReslt, new byte[] { value });
+	}
+
+	public String getMServiceID() {
+		return hasDynamicProperty(TlvTags.MServiceID) ? UmspUtils.fromGsmBytes(getDynamicProperty(TlvTags.MServiceID))
+				: "";
+	}
+
+	public void setMServiceID(String value) {
+		if (StringUtils.hasLength(value)) {
+			setDynamicProperty(TlvTags.MServiceID, UmspUtils.string2FixedBytes(value, 21));
+		} else {
+			removeDynamicProperty(TlvTags.MServiceID);
+		}
+	}
+
+	public String getDestTermPseudo() {
+		return hasDynamicProperty(TlvTags.DestTermPseudo) ? UmspUtils
+				.fromGsmBytes(getDynamicProperty(TlvTags.DestTermPseudo)) : "";
+	}
+
+	public void setDestTermPseudo(String destTermPseudo) {
+		if (StringUtils.hasLength(destTermPseudo)) {
+			setDynamicProperty(TlvTags.DestTermPseudo,
+					UmspUtils.string2FixedBytes(destTermPseudo, destTermPseudo.length()));
+		} else {
+			removeDynamicProperty(TlvTags.DestTermPseudo);
+		}
+	}
+
 	@Override
 	public Submit clone() {
 		return (Submit) super.clone();
@@ -227,7 +364,14 @@ public class Submit extends SmgpTlvDataPacket {
 				+ ServiceID + ", FeeType=" + FeeType + ", FeeCode=" + FeeCode + ", FixedFee=" + FixedFee
 				+ ", MsgFormat=" + MsgFormat + ", ValidTime=" + ValidTime + ", AtTime=" + AtTime + ", SrcTermID="
 				+ SrcTermID + ", ChargeTermID=" + ChargeTermID + ", DestTermIDCount=" + DestTermIDCount
-				+ ", DestTermID=" + Arrays.toString(DestTermID) + ", MsgLength=" + MsgLength + ", MsgContent="
-				+ Arrays.toString(MsgContent) + ", Reserve=" + Reserve + "]";
+				+ ", DestTermID=" + Arrays.toString(DestTermID) + ", MsgLength=" + MsgLength + ", Reserve=" + Reserve
+				+ ", tp_udhi=" + tp_udhi + ", getMessageContent()=" + getMessageContent() + ", getTp_pid()="
+				+ getTp_pid() + ", getTp_udhi()=" + getTp_udhi() + ", getLinkId()=" + getLinkId() + ", getMsgSrc()="
+				+ getMsgSrc() + ", getChargeUserType()=" + getChargeUserType() + ", getChargeTermType()="
+				+ getChargeTermType() + ", getChargeTermPseudo()=" + getChargeTermPseudo() + ", getDestTermTypeType()="
+				+ getDestTermTypeType() + ", getPkTotal()=" + getPkTotal() + ", getPkNumber()=" + getPkNumber()
+				+ ", getSubmitMsgType()=" + getSubmitMsgType() + ", getSPDealResult()=" + getSPDealResult()
+				+ ", getMServiceID()=" + getMServiceID() + ", getDestTermPseudo()=" + getDestTermPseudo() + "]";
 	}
+
 }

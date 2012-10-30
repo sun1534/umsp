@@ -10,6 +10,7 @@ import com.partsoft.umsp.smgp.Constants.TlvTags;
 import com.partsoft.umsp.utils.UmspUtils;
 import com.partsoft.utils.Assert;
 import com.partsoft.utils.HexUtils;
+import com.partsoft.utils.StringUtils;
 
 public class Deliver extends SmgpTlvDataPacket {
 
@@ -137,6 +138,15 @@ public class Deliver extends SmgpTlvDataPacket {
 	public void setTp_udhi(byte value) {
 		setDynamicProperty(TlvTags.TP_udhi, new byte[]{value});
 	}
+	
+	public byte getTp_pid() {
+		return this.hasDynamicProperty(TlvTags.TP_udhi) ? getDynamicProperty(TlvTags.TP_udhi)[0] : 0;
+	}
+	
+	public void setTp_pid(byte value) {
+		setDynamicProperty(TlvTags.TP_udhi, new byte[]{value});
+	}
+
 
 	@Override
 	public int getDataSize() {
@@ -147,13 +157,68 @@ public class Deliver extends SmgpTlvDataPacket {
 	public Deliver clone() {
 		return (Deliver) super.clone();
 	}
+	
+	public String getLinkId() {
+		return hasDynamicProperty(TlvTags.LinkID) ? 
+				UmspUtils.fromGsmBytes(getDynamicProperty(TlvTags.LinkID)) : "";
+	}
+	
+	public  void setLinkId(String linkId) {
+		if (StringUtils.hasLength(linkId)) {
+			setDynamicProperty(TlvTags.LinkID,  UmspUtils.string2FixedBytes(linkId, 20));
+		} else {
+			removeDynamicProperty(TlvTags.LinkID);
+		}
+	}
+	
+	public byte getSrcTermType() {
+		return hasDynamicProperty(TlvTags.SrcTermType) ?
+				getDynamicProperty(TlvTags.SrcTermType)[0] : 0;
+	}
+	
+	public void setSrcTermType(byte value) {
+		if (value > 0) {
+			setDynamicProperty(TlvTags.LinkID, new byte[]{value});
+		} else {
+			removeDynamicProperty(TlvTags.LinkID);
+		}
+	}
+	
+	public String getSrcTermPseudo() {
+		return hasDynamicProperty(TlvTags.SrcTermPseudo) ? 
+				UmspUtils.fromGsmBytes(getDynamicProperty(TlvTags.SrcTermPseudo)) : "";
+	}
+	
+	public  void setSrcTermPseudo(String value) {
+		if (StringUtils.hasLength(value)) {
+			setDynamicProperty(TlvTags.SrcTermPseudo,  UmspUtils.string2FixedBytes(value, value.length()));
+		} else {
+			removeDynamicProperty(TlvTags.SrcTermPseudo);
+		}
+	}
+
+	public String getSPDealResult() {
+		return hasDynamicProperty(TlvTags.SPDealReslt) ? 
+				UmspUtils.fromGsmBytes(getDynamicProperty(TlvTags.SPDealReslt)) : "";
+	}
+	
+	public  void setSPDealResult(String value) {
+		if (StringUtils.hasLength(value)) {
+			setDynamicProperty(TlvTags.SPDealReslt,  UmspUtils.string2FixedBytes(value, value.length()));
+		} else {
+			removeDynamicProperty(TlvTags.SPDealReslt);
+		}
+	}
 
 	@Override
 	public String toString() {
 		return "Deliver [NodeId=" + NodeId + ", NodeTime=" + NodeTime + ", IsReport=" + IsReport + ", MsgFormat="
 				+ MsgFormat + ", RecvTime=" + RecvTime + ", SrcTermID=" + SrcTermID + ", DestTermID=" + DestTermID
-				+ ", MsgLength=" + MsgLength + ", MsgContent=" + HexUtils.toHex(MsgContent) + ", Reserve=" + Reserve
-				+ "]";
+				+ ", MsgLength=" + MsgLength + ", MsgContent=" + getMessageContent() + ", Reserve=" + Reserve
+				+ ", requestId=" + requestId + ", sequenceId=" + sequenceId + ", createTimeMillis=" + createTimeMillis
+				+ ", getMsgID()=" + HexUtils.toHex(getMsgID()) + ", getTp_udhi()=" + getTp_udhi() + ", getLinkId()="
+				+ getLinkId() + ", getSrcTermType()=" + getSrcTermType() + ", getSrcTermPseudo()=" + getSrcTermPseudo()
+				+ ", getSPDealResult()=" + getSPDealResult() + "]";
 	}
 
 }
