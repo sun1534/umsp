@@ -78,6 +78,7 @@ public class Submit extends SmgpTlvDataPacket {
 		out.writeByte(DestTermIDCount);
 		for (int i = 0; i < DestTermIDCount; i++) {
 			if (DestTermID[i].startsWith("86")) {
+				//修复SMGP不接收开头为86的号码
 				writeFixedString(out, DestTermID[i].substring(2), 21);
 			} else {
 				writeFixedString(out, DestTermID[i], 21);
