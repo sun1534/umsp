@@ -77,7 +77,11 @@ public class Submit extends SmgpTlvDataPacket {
 		writeFixedString(out, ChargeTermID, 21);
 		out.writeByte(DestTermIDCount);
 		for (int i = 0; i < DestTermIDCount; i++) {
-			writeFixedString(out, DestTermID[i], 21);
+			if (DestTermID[i].startsWith("86")) {
+				writeFixedString(out, DestTermID[i].substring(2), 21);
+			} else {
+				writeFixedString(out, DestTermID[i], 21);
+			}
 		}
 		out.writeByte(MsgLength);
 		out.write(MsgContent, 0, MsgLength);
