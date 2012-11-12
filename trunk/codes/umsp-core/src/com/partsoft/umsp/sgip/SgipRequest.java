@@ -7,8 +7,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
-import java.util.PriorityQueue;
 import java.util.Queue;
+import java.util.concurrent.LinkedBlockingDeque;
 
 import com.partsoft.umsp.Context;
 import com.partsoft.umsp.Request;
@@ -262,7 +262,7 @@ public class SgipRequest implements com.partsoft.umsp.Request {
 			@SuppressWarnings("unchecked")
 			Queue<Submit> submits = (Queue<Submit>) ctx.getAttribute(ARG_SUBMIT_QUEUE);
 			if (submits == null) {
-				submits = new PriorityQueue<Submit>();
+				submits = new LinkedBlockingDeque<Submit>();
 				ctx.setAttribute(ARG_SUBMIT_QUEUE, submits);
 			}
 			return submits;

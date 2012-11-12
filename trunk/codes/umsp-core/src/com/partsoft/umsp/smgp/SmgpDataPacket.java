@@ -68,5 +68,13 @@ public abstract class SmgpDataPacket extends AbstractDataPacket implements DataP
 		return getClass().getSimpleName() +" [requestId=" + requestId + ", sequenceId=" + sequenceId + ", createTimeMillis="
 				+ createTimeMillis + ", enabled=" + enabled + "]";
 	}
+	
+	public int compareTo(Object o) {
+		int result = -1;
+		if (o instanceof SmgpDataPacket) {
+			result = (int) (this.createTimeMillis - ((SmgpDataPacket)o).createTimeMillis);
+		}
+		return result ;
+	}
 
 }

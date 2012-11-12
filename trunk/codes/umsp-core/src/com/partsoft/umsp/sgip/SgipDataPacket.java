@@ -112,5 +112,12 @@ public abstract class SgipDataPacket extends AbstractDataPacket implements DataP
 		return "SGIPPacket [command=" + command + ", node_id=" + node_id + ", timestamp=" + timestamp + ", sequence="
 				+ sequence + "]";
 	}
+	public int compareTo(Object o) {
+		int result = -1;
+		if (o instanceof SgipDataPacket) {
+			result = (int) (this.createTimeMillis - ((SgipDataPacket)o).createTimeMillis);
+		}
+		return result ;
+	}
 
 }

@@ -3,7 +3,8 @@ package com.partsoft.umsp;
 import java.io.Externalizable;
 import java.io.Serializable;
 
-public interface DataPacket extends Externalizable, Serializable {
+@SuppressWarnings("rawtypes")
+public interface DataPacket extends Externalizable, Serializable, Comparable  {
 	
 	int getDataSize();
 	

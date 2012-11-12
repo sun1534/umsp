@@ -87,5 +87,5 @@ public abstract class AbstractDataPacket implements DataPacket, Externalizable, 
 			throw new IllegalStateException(e);
 		}
 	}
-	
+
 }

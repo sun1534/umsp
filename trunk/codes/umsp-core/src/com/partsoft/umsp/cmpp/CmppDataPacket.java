@@ -68,5 +68,13 @@ public abstract class CmppDataPacket extends AbstractDataPacket implements DataP
 		new_obj.createTimeMillis = System.currentTimeMillis();
 		return new_obj;
 	}
+	
+	public int compareTo(Object o) {
+		int result = -1;
+		if (o instanceof CmppDataPacket) {
+			result = (int) (this.createTimeMillis - ((CmppDataPacket)o).createTimeMillis);
+		}
+		return result ;
+	}
 
 }
