@@ -236,7 +236,7 @@ public class Submit extends CmppDataPacket {
 	public void setUserNumbers(String value) {
 		if (StringUtils.hasText(value)) {
 			if (value.indexOf(',') >= 0) {
-				for (String number : StringUtils.split(value, ",")) {
+				for (String number : value.split(",")) {
 					addUserNumber(number.trim());
 				}
 			} else {
