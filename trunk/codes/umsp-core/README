@@ -1,0 +1,9 @@
+jits sdk url:
+https://jits.googlecode.com/svn/trunk/codes/jits-sdk
+svn checkout:
+svn checkout https://jits.googlecode.com/svn/trunk/codes/jits-sdk <tools_path>/jits-sdk
+
+cmd:
+ant eclipse
+ant jar
+ant ...
