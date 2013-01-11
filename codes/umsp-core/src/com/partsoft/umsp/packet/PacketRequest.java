@@ -48,8 +48,7 @@ public class PacketRequest implements Request {
 	}
 
 	protected void updateRequestTime(long timestamp) {
-		if (_requestTimestamp <= 0 || timestamp <= 0)
-			_requestTimestamp = timestamp;
+		_requestTimestamp = timestamp;
 	}
 
 	public InputStream getInputStream() throws IOException {

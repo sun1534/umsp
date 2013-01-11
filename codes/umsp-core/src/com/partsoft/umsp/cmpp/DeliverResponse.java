@@ -37,9 +37,9 @@ public class DeliverResponse extends CmppDataPacket {
 	protected void readDataInput(DataInput in) throws IOException {
 		super.readDataInput(in);
 		long tmp_msgid = in.readLong();
-		this.nodeId = CmppUtils.getNodeIdFromMsgID(tmp_msgid);
-		this.nodeTime = CmppUtils.getNodeTimeFromMsgID(tmp_msgid);
-		this.nodeSeq  = CmppUtils.getSequenceIdFromMsgID(tmp_msgid);
+		this.nodeId = CmppUtils.extractNodeIdFromMsgID(tmp_msgid);
+		this.nodeTime = CmppUtils.extractNodeTimeFromMsgID(tmp_msgid);
+		this.nodeSeq  = CmppUtils.extractNodeSeqFromMsgID(tmp_msgid);
 		this.result = in.readInt();
 	}
 

@@ -130,7 +130,6 @@ public class PacketConnection implements Connection {
 						if (Log.isDebugEnabled() && no_progress > 0) {
 							Log.debug(String.format("last request data packet not complete to be continue"));
 						}
-						_request.updateRequestTime(System.currentTimeMillis());
 						if (_requests <= 0) {
 							handleConnect();
 							reset(false);
@@ -227,7 +226,7 @@ public class PacketConnection implements Connection {
 							reset(false);
 							more_in_buffer = _parser.isMoreInBuffer() || _endp.isBufferingInput();
 						} else {
-							_request.updateRequestTime(-1);
+//							_request.updateRequestTime(-1);
 							reset(true);
 						}
 						no_progress = 0;
@@ -278,6 +277,7 @@ public class PacketConnection implements Connection {
 
 	protected void handleRequest() throws IOException {
 		if (_handler.isRunning()) {
+			_request.updateRequestTime(System.currentTimeMillis());
 			boolean error = false;
 			try {
 				if (_out != null)

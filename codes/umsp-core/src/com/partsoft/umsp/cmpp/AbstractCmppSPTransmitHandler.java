@@ -200,10 +200,10 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 				if (!StringUtils.hasText(sb.sourceId) || !sb.sourceId.startsWith(sp_number)) {
 					sb.sourceId = "" + this.spNumber;
 				}
-				sb.nodeId = this.enterpriseId;
-				sb.nodeTime = CalendarUtils.nowTimestampInYearDuring();
+//				sb.nodeId = this.enterpriseId;
+//				sb.nodeTime = CalendarUtils.getTimestampInYearDuring(sb.createTimeMillis);
 				sb.sequenceId = CmppUtils.generateRequestSequence(request);
-				sb.nodeSeq = sb.sequenceId;
+//				sb.nodeSeq = sb.sequenceId;
 				sb.protocolVersion = this.protocolVersion;
 				int transmit_listener_size = ListUtils.size(transmitListener);
 				if (transmit_listener_size > 0) {
@@ -268,7 +268,10 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 		}
 
 		DeliverResponse deliver_response = new DeliverResponse();
+		
+		//必须相同
 		deliver_response.sequenceId = deliver_packet.sequenceId;
+		
 		// 构建msgid
 		deliver_response.nodeId = deliver_packet.nodeId;
 		deliver_response.nodeTime = deliver_packet.nodeTime;
@@ -302,16 +305,6 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 			int last_pare_submit_index = CmppUtils.extractRequestSubmittedRepliedCount(request);
 			List<Submit> posts = (List<Submit>) CmppUtils.extractRequestSubmitteds(request);
 			CmppUtils.updateSubmittedRepliedCount(request, last_pare_submit_index + 1);
-			if (CmppUtils.extractRequestSubmittedRepliedCount(request) == CmppUtils
-					.extractRequestSubmittedCount(request)) {
-				returnQueuedSubmits(null);
-				CmppUtils.cleanRequestSubmitteds(request);
-				if (testQueuedSubmits()) {
-					this.doPostSubmit(request, response);
-				} else {
-					do_unbind = isAutoReSubmit() ? false : true;
-				}
-			}
 			Submit submitted = posts.get(last_pare_submit_index);
 			int transmit_listener_size = ListUtils.size(transmitListener);
 			if (transmit_listener_size > 0) {
@@ -323,6 +316,17 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 					} catch (Throwable e) {
 						Log.ignore(e);
 					}
+				}
+			}
+			
+			if (CmppUtils.extractRequestSubmittedRepliedCount(request) >= CmppUtils
+					.extractRequestSubmittedCount(request)) {
+				returnQueuedSubmits(null);
+				CmppUtils.cleanRequestSubmitteds(request);
+				if (testQueuedSubmits()) {
+					this.doPostSubmit(request, response);
+				} else {
+					do_unbind = isAutoReSubmit() ? false : true;
 				}
 			}
 		} else {

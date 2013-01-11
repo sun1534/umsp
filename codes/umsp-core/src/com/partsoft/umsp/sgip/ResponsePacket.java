@@ -7,6 +7,7 @@ import java.io.IOException;
 import com.partsoft.umsp.io.Buffer;
 import com.partsoft.umsp.sgip.Constants.BindResults;
 
+@SuppressWarnings("serial")
 public class ResponsePacket extends SgipDataPacket {
 
 	public static final int PACKET_SIZE = SgipDataPacket.PACKET_SIZE + Buffer.BYTE_SIZE;

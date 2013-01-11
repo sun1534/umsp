@@ -148,9 +148,9 @@ public class Submit extends CmppDataPacket {
 		super.readDataInput(in);
 
 		long temp_msgid = in.readLong();
-		nodeId = CmppUtils.getNodeIdFromMsgID(temp_msgid);
-		nodeTime = CmppUtils.getNodeTimeFromMsgID(temp_msgid);
-		nodeSeq = CmppUtils.getSequenceIdFromMsgID(temp_msgid);
+		nodeId = CmppUtils.extractNodeIdFromMsgID(temp_msgid);
+		nodeTime = CmppUtils.extractNodeTimeFromMsgID(temp_msgid);
+		nodeSeq = CmppUtils.extractNodeSeqFromMsgID(temp_msgid);
 
 		pkTotal = in.readByte();
 		pkNumber = in.readByte();
@@ -244,6 +244,23 @@ public class Submit extends CmppDataPacket {
 				addUserNumber(value.trim());
 			}
 		}
+	}
+	
+	public String getUserNumbersTrimCNPrefix() {
+		StringBuffer buffer = new StringBuffer(this.destUserCount * 21);
+		boolean appended = false;
+		for (int i = 0; i < this.destUserCount; i++) {
+			if (appended)
+				buffer.append(",");
+			else
+				appended = true;
+			if (destTerminalIds[i].startsWith("86")) {
+				buffer.append(destTerminalIds[i].substring(2));
+			} else {
+				buffer.append(destTerminalIds[i]);
+			}
+		}
+		return buffer.toString();
 	}
 
 	public String getUserNumbers() {

@@ -30,7 +30,7 @@ public class PacketClientConnector extends AbstractConnector {
 
 	private Proxy proxy;
 
-	protected int _activeConnections = 0;
+	private int _dispatchedConnections = 0;
 
 	protected int _successConnect = 0;
 
@@ -115,6 +115,9 @@ public class PacketClientConnector extends AbstractConnector {
 		configure(_clientSocket);
 		Connection connection = new Connection(_clientSocket);
 		connection.dispatch();
+		synchronized (this) {
+			_dispatchedConnections++;
+		}
 	}
 
 	protected PacketConnection newPacketConnection(EndPoint endpoint) {
@@ -146,7 +149,7 @@ public class PacketClientConnector extends AbstractConnector {
 			_reConnectIntervalTime = SLEEP_TIME;
 		super.doStart();
 		// Start selector thread
-		_activeConnections = 0;
+		_dispatchedConnections = 0;
 		_successConnect = 0;
 		Assert.isTrue(_maxConnection > 0);
 		synchronized (this) {
@@ -169,16 +172,16 @@ public class PacketClientConnector extends AbstractConnector {
 	@Override
 	protected void connectionOpened(PacketConnection connection) {
 		super.connectionOpened(connection);
-		synchronized (this) {
-			_activeConnections++;
-		}
+//		synchronized (this) {
+//			_dispatchedConnections++;
+//		}
 	}
 
 	@Override
 	protected void connectionClosed(PacketConnection connection) {
 		super.connectionClosed(connection);
 		synchronized (this) {
-			_activeConnections--;
+			_dispatchedConnections--;
 		}
 		if (isAutoReConnect()) {
 			synchronized (this) {
@@ -187,7 +190,7 @@ public class PacketClientConnector extends AbstractConnector {
 			return;
 		}
 
-		if (_activeConnections <= 0) {
+		if (_dispatchedConnections <= 0) {
 			try {
 				getOrigin().delayStop();
 				if (Log.isDebugEnabled())
@@ -222,9 +225,9 @@ public class PacketClientConnector extends AbstractConnector {
 				boolean connect_error = false;
 				do {
 					synchronized (PacketClientConnector.this) {
-						if (_activeConnections < getMaxConnection()) {
+						if (_dispatchedConnections < getMaxConnection()) {
 							try {
-								connect(_activeConnections);
+								connect(_dispatchedConnections);
 								if (!isStarted()) break;
 								_successConnect++;
 								connect_error = false;

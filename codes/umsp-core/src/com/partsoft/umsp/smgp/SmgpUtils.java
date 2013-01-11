@@ -11,7 +11,6 @@ import java.util.List;
 
 import com.partsoft.umsp.Client;
 import com.partsoft.umsp.Constants.SMS;
-import com.partsoft.umsp.Context;
 import com.partsoft.umsp.Request;
 import com.partsoft.umsp.Response;
 import com.partsoft.umsp.handler.PacketContextHandler;
@@ -70,7 +69,7 @@ public abstract class SmgpUtils {
 	/**
 	 * 序列号参数
 	 */
-	public static final String ARG_REQUEST_SEQUENCE = "smgp.context.sequence";
+	public static final String ARG_REQUEST_SEQUENCE = "smgp.request.sequence";
 
 	/**
 	 * 已提交服务器的消息列表
@@ -375,18 +374,17 @@ public abstract class SmgpUtils {
 	 */
 	public static int generateRequestSequence(Request request) {
 		int result = 1;
-		Context context = request.getContext();
-		synchronized (context) {
-			Integer seq = (Integer) context.getAttribute(ARG_REQUEST_SEQUENCE);
+		synchronized (request) {
+			Integer seq = (Integer) request.getAttribute(ARG_REQUEST_SEQUENCE);
 			if (seq == null) {
-				seq = 1;
+				seq = 0;
 			}
-			seq++;
-			if (seq++ >= Integer.MAX_VALUE) {
+			seq = seq + 1;
+			if (seq >= Integer.MAX_VALUE) {
 				seq = 1;
 			}
 			result = seq;
-			context.setAttribute(ARG_REQUEST_SEQUENCE, seq);
+			request.setAttribute(ARG_REQUEST_SEQUENCE, seq);
 		}
 		return result;
 	}

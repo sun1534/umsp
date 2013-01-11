@@ -56,7 +56,7 @@ public class Submit extends SmgpTlvDataPacket {
 
 	public String Reserve;// 8 Octet String 保留
 
-	protected byte tp_udhi;
+//	protected byte tp_udhi;
 
 	public Submit() {
 		super(RequestIDs.submit);
@@ -119,7 +119,7 @@ public class Submit extends SmgpTlvDataPacket {
 		in.readFully(MsgContent, 0, MsgLength);
 		Reserve = readFixedString(in, 8);
 		readTlvDatas(in);
-		tp_udhi = this.hasDynamicProperty(TlvTags.TP_udhi) ? getDynamicProperty(TlvTags.TP_udhi)[0] : 0;
+//		tp_udhi = this.hasDynamicProperty(TlvTags.TP_udhi) ? getDynamicProperty(TlvTags.TP_udhi)[0] : 0;
 	}
 
 	@Override
@@ -131,10 +131,13 @@ public class Submit extends SmgpTlvDataPacket {
 		MsgFormat = (byte) code;
 		MsgContent = UmspUtils.toGsmBytes(msg, code);
 		MsgLength = MsgContent == null ? 0 : MsgContent.length;
-		tp_udhi = 0;
-		this.removeDynamicProperty(TlvTags.TP_udhi);
-		this.removeDynamicProperty(TlvTags.PkTotal);
-		this.removeDynamicProperty(TlvTags.PkNumber);
+//		tp_udhi = 0;
+		this.setTp_udhi((byte)0);
+		this.setPkTotal((byte)0);
+		this.setPkNumber((byte)0);
+		//this.removeDynamicProperty(TlvTags.TP_udhi);
+		//this.removeDynamicProperty(TlvTags.PkTotal);
+		//this.removeDynamicProperty(TlvTags.PkNumber);
 	}
 
 	public void setMessageContent(String msg) {
@@ -161,6 +164,23 @@ public class Submit extends SmgpTlvDataPacket {
 			}
 		}
 	}
+	
+	public String getUserNumbersTrimCNPrefix() {
+		StringBuffer buffer = new StringBuffer(this.DestTermIDCount * 21);
+		boolean appended = false;
+		for (int i = 0; i < this.DestTermIDCount; i++) {
+			if (appended)
+				buffer.append(",");
+			else
+				appended = true;
+			if (DestTermID[i].startsWith("86")) {
+				buffer.append(DestTermID[i].substring(2));
+			} else {
+				buffer.append(DestTermID[i]);
+			}
+		}
+		return buffer.toString();
+	}
 
 	public String getUserNumbers() {
 		StringBuffer buffer = new StringBuffer(this.DestTermIDCount * 21);
@@ -177,7 +197,7 @@ public class Submit extends SmgpTlvDataPacket {
 
 	public int getMessageCascadeCount() {
 		byte result = 0;
-		if (this.tp_udhi == 1 && this.MsgContent[1] == 0) {
+		if (this.getTp_udhi() == 1 && this.MsgContent[1] == 0) {
 			result = this.MsgContent[4];
 		}
 		return result & 0xFF;
@@ -185,7 +205,7 @@ public class Submit extends SmgpTlvDataPacket {
 
 	public int getMessageCascadeRefId() {
 		byte result = 0;
-		if (this.tp_udhi == 1 && this.MsgContent[1] == 0) {
+		if (this.getTp_udhi() == 1 && this.MsgContent[1] == 0) {
 			result = this.MsgContent[3];
 		}
 		return result;
@@ -193,14 +213,14 @@ public class Submit extends SmgpTlvDataPacket {
 
 	public int getMessageCascadeOrder() {
 		byte result = 0;
-		if (this.tp_udhi == 1 && this.MsgContent[1] == 0) {
+		if (this.getTp_udhi() == 1 && this.MsgContent[1] == 0) {
 			result = this.MsgContent[5];
 		}
 		return result & 0xFF;
 	}
 
 	public String getMessageContent() {
-		if (tp_udhi == 1 && (this.MsgContent[1] == 0)) {
+		if (getTp_udhi() == 1 && (this.MsgContent[1] == 0)) {
 			return UmspUtils.fromGsmBytes(MsgContent, 6, MsgLength - 6, MsgFormat);
 		} else {
 			//TODO 还可能需要做更多的内容判断
@@ -229,10 +249,12 @@ public class Submit extends SmgpTlvDataPacket {
 		this.MsgFormat = (byte) messageCode;
 		this.MsgLength = byte_buffer.length();
 		this.MsgContent = byte_buffer.array();
-		this.tp_udhi = 1;
-		this.setDynamicProperty(TlvTags.TP_udhi, new byte[] { 1 });
-		this.setDynamicProperty(TlvTags.PkTotal, new byte[] { (byte) count });
-		this.setDynamicProperty(TlvTags.PkNumber, new byte[] { (byte) index });
+		setTp_udhi((byte)1);
+		setPkTotal((byte)count);
+		setPkNumber((byte)index);
+//		this.setDynamicProperty(TlvTags.TP_udhi, new byte[] { 1 });
+//		this.setDynamicProperty(TlvTags.PkTotal, new byte[] { (byte) count });
+//		this.setDynamicProperty(TlvTags.PkNumber, new byte[] { (byte) index });
 	}
 
 	public byte getTp_pid() {
@@ -248,7 +270,11 @@ public class Submit extends SmgpTlvDataPacket {
 	}
 
 	public void setTp_udhi(byte value) {
-		setDynamicProperty(TlvTags.TP_udhi, new byte[] { value });
+		if (value != 0) {
+			setDynamicProperty(TlvTags.TP_udhi, new byte[] { value });
+		} else {
+			removeDynamicProperty(TlvTags.TP_udhi);
+		}
 	}
 
 	public String getLinkId() {
@@ -280,7 +306,11 @@ public class Submit extends SmgpTlvDataPacket {
 	}
 
 	public void setChargeUserType(byte value) {
-		setDynamicProperty(TlvTags.ChargeUserType, new byte[] { value });
+		if (value != 0) {
+			setDynamicProperty(TlvTags.ChargeUserType, new byte[] { value });
+		} else {
+			removeDynamicProperty(TlvTags.ChargeUserType);
+		}
 	}
 
 	public byte getChargeTermType() {
@@ -288,7 +318,11 @@ public class Submit extends SmgpTlvDataPacket {
 	}
 
 	public void setChargeTermType(byte value) {
-		setDynamicProperty(TlvTags.ChargeTermType, new byte[] { value });
+		if (value != 0) {
+			setDynamicProperty(TlvTags.ChargeTermType, new byte[] { value });
+		} else {
+			removeDynamicProperty(TlvTags.ChargeTermType);
+		}
 	}
 
 	public String getChargeTermPseudo() {
@@ -310,7 +344,11 @@ public class Submit extends SmgpTlvDataPacket {
 	}
 
 	public void setDestTermType(byte value) {
-		setDynamicProperty(TlvTags.DestTermType, new byte[] { value });
+		if (value != 0) {
+			setDynamicProperty(TlvTags.DestTermType, new byte[] { value });
+		} else {
+			removeDynamicProperty(TlvTags.DestTermType);
+		}
 	}
 
 	public byte getPkTotal() {
@@ -318,7 +356,11 @@ public class Submit extends SmgpTlvDataPacket {
 	}
 
 	public void setPkTotal(byte value) {
-		setDynamicProperty(TlvTags.PkTotal, new byte[] { value });
+		if (value != 0) {
+			setDynamicProperty(TlvTags.PkTotal, new byte[] { value });
+		} else {
+			removeDynamicProperty(TlvTags.PkTotal);
+		}
 	}
 
 	public byte getPkNumber() {
@@ -326,7 +368,11 @@ public class Submit extends SmgpTlvDataPacket {
 	}
 
 	public void setPkNumber(byte value) {
-		setDynamicProperty(TlvTags.PkNumber, new byte[] { value });
+		if (value != 0) {
+			setDynamicProperty(TlvTags.PkNumber, new byte[] { value });
+		} else {
+			removeDynamicProperty(TlvTags.PkNumber);
+		}
 	}
 
 	public byte getSubmitMsgType() {
@@ -334,7 +380,11 @@ public class Submit extends SmgpTlvDataPacket {
 	}
 
 	public void setSubmitMsgType(byte value) {
-		setDynamicProperty(TlvTags.SubmitMsgType, new byte[] { value });
+		if (value != 0) {
+			setDynamicProperty(TlvTags.SubmitMsgType, new byte[] { value });
+		} else {
+			removeDynamicProperty(TlvTags.SubmitMsgType);
+		}
 	}
 
 	public byte getSPDealResult() {
@@ -342,7 +392,11 @@ public class Submit extends SmgpTlvDataPacket {
 	}
 
 	public void setSPDealResult(byte value) {
-		setDynamicProperty(TlvTags.SPDealReslt, new byte[] { value });
+		if (value != 0) {
+			setDynamicProperty(TlvTags.SPDealReslt, new byte[] { value });
+		} else {
+			removeDynamicProperty(TlvTags.SPDealReslt);
+		}
 	}
 
 	public String getMServiceID() {
@@ -384,7 +438,7 @@ public class Submit extends SmgpTlvDataPacket {
 				+ ", MsgFormat=" + MsgFormat + ", ValidTime=" + ValidTime + ", AtTime=" + AtTime + ", SrcTermID="
 				+ SrcTermID + ", ChargeTermID=" + ChargeTermID + ", DestTermIDCount=" + DestTermIDCount
 				+ ", DestTermID=" + Arrays.toString(DestTermID) + ", MsgLength=" + MsgLength + ", Reserve=" + Reserve
-				+ ", tp_udhi=" + tp_udhi + ", getMessageContent()=" + getMessageContent() + ", getTp_pid()="
+				+ ", tp_udhi=" + getTp_udhi() + ", getMessageContent()=" + getMessageContent() + ", getTp_pid()="
 				+ getTp_pid() + ", getTp_udhi()=" + getTp_udhi() + ", getLinkId()=" + getLinkId() + ", getMsgSrc()="
 				+ getMsgSrc() + ", getChargeUserType()=" + getChargeUserType() + ", getChargeTermType()="
 				+ getChargeTermType() + ", getChargeTermPseudo()=" + getChargeTermPseudo() + ", getDestTermTypeType()="

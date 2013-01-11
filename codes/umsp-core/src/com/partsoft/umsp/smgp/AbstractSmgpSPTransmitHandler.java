@@ -309,18 +309,7 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 			int last_pare_submit_index = SmgpUtils.extractRequestSubmittedRepliedCount(request);
 			List<Submit> posts = SmgpUtils.extractRequestSubmitteds(request);
 			SmgpUtils.updateSubmittedRepliedCount(request, last_pare_submit_index + 1);
-			if (SmgpUtils.extractRequestSubmittedRepliedCount(request) == SmgpUtils
-					.extractRequestSubmittedCount(request)) {
-				returnQueuedSubmits(null);
-				SmgpUtils.cleanRequestSubmitteds(request);
-				if (testQueuedSubmits()) {
-					this.doPostSubmit(request, response);
-				} else {
-					do_unbind = isAutoReSubmit() ? false : true;
-				}
-			}
 			Submit submitted = posts.get(last_pare_submit_index);
-
 			int transmit_listener_size = ListUtils.size(transmitListener);
 			if (transmit_listener_size > 0) {
 				TransmitEvent event = new TransmitEvent(new Object[] { submitted, res });
@@ -331,6 +320,16 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 					} catch (Throwable e) {
 						Log.ignore(e);
 					}
+				}
+			}
+			if (SmgpUtils.extractRequestSubmittedRepliedCount(request) >= SmgpUtils
+					.extractRequestSubmittedCount(request)) {
+				returnQueuedSubmits(null);
+				SmgpUtils.cleanRequestSubmitteds(request);
+				if (testQueuedSubmits()) {
+					this.doPostSubmit(request, response);
+				} else {
+					do_unbind = isAutoReSubmit() ? false : true;
 				}
 			}
 		} else {

@@ -1,6 +1,13 @@
 package com.partsoft.umsp;
 
 public interface SpClientInfoGetter {
+	
+	/**
+	 * 检查是否需要检查IP
+	 * @param uid
+	 * @return
+	 */
+	boolean isMustCheckRemoteAddr(String uid);
 
 	/**
 	 * 判断远程地址是否可信

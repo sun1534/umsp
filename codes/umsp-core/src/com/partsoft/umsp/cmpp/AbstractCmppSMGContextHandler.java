@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import com.partsoft.umsp.Constants;
 import com.partsoft.umsp.Constants.MessageCodes;
+import com.partsoft.umsp.PhoneNumberValidator;
 import com.partsoft.umsp.Request;
 import com.partsoft.umsp.Response;
 import com.partsoft.umsp.cmpp.Constants.Commands;
@@ -39,6 +40,8 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 
 	protected Object transmitListener;
 
+	protected PhoneNumberValidator phoneNumberValidator;
+
 	/**
 	 * 消息占位长度
 	 */
@@ -62,6 +65,10 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 		} else {
 			this.transmitListener = ListUtils.add(this.transmitListener, listener);
 		}
+	}
+
+	public void setPhoneNumberValidator(PhoneNumberValidator phoneNumberValidator) {
+		this.phoneNumberValidator = phoneNumberValidator;
 	}
 
 	public void addTransmitListener(TransmitListener listener) {
@@ -105,7 +112,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 		super.doBind(request, response);
 		Connect bind = (Connect) CmppUtils.extractRequestPacket(request);
 		ConnectResponse resp = (ConnectResponse) context_smgp_packet_maps.get(Commands.CMPP_CONNECT_RESP).clone();
-		resp.sequenceId = CmppUtils.generateRequestSequence(request);
+		resp.sequenceId = bind.sequenceId;
 		resp.status = 5;
 		if (resp.protocolVersion < bind.protocolVersion) {
 			resp.status = 4;
@@ -128,7 +135,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 					int max_connects = resolveRequestMaxConnections(bind.enterpriseId);
 					if (max_connects == 0) {
 						resp.status = 6;
-					} else if (max_connects > 0 ) {
+					} else if (max_connects > 0) {
 						if (request_connected >= max_connects) {
 							resp.status = 6;
 						}
@@ -210,6 +217,8 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 						}
 					}
 				}
+				doActiveTestRequest(request, response);
+				CmppUtils.stepIncreaseRequestActiveTest(request);
 			} else if (testQueuedDelivers(serviceNumber)) {
 				doPostDeliver(request, response);
 			}
@@ -217,7 +226,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 			super.handleTimeout(request, response);
 		}
 	}
-
+	
 	protected void doPostDeliver(Request request, Response response) throws IOException {
 		Integer submitted = Integer.valueOf(0);
 		String serviceNumber = CmppUtils.extractRequestServiceNumber(request);
@@ -225,10 +234,13 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 		if (takedPostSubmits != null) {
 			for (Deliver sb : takedPostSubmits) {
 				sb.protocolVersion = this.protocolVersion;
+				
 				sb.nodeId = this.gatewayId;
 				sb.nodeTime = CalendarUtils.nowTimestampInYearDuring();
+				sb.nodeSeq = CmppUtils.generateContextSequence(request.getContext());
+				
 				sb.sequenceId = CmppUtils.generateRequestSequence(request);
-				sb.nodeSeq = sb.sequenceId;
+				
 				int transmit_listener_size = ListUtils.size(transmitListener);
 				if (transmit_listener_size > 0) {
 					TransmitEvent event = new TransmitEvent(sb);
@@ -298,15 +310,6 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 			int last_pare_submit_index = CmppUtils.extractRequestSubmittedRepliedCount(request);
 			List<Deliver> posts = (List<Deliver>) CmppUtils.extractRequestSubmitteds(request);
 			CmppUtils.updateSubmittedRepliedCount(request, last_pare_submit_index + 1);
-			if (CmppUtils.extractRequestSubmittedRepliedCount(request) == CmppUtils
-					.extractRequestSubmittedCount(request)) {
-				returnQueuedDelivers(serviceNumber, null);
-				CmppUtils.cleanRequestSubmitteds(request);
-				if (testQueuedDelivers(serviceNumber)) {
-					this.doPostDeliver(request, response);
-				}
-			}
-
 			Deliver submitted = posts.get(last_pare_submit_index);
 			int transmit_listener_size = ListUtils.size(transmitListener);
 			if (transmit_listener_size > 0) {
@@ -320,20 +323,35 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 					}
 				}
 			}
+			if (CmppUtils.extractRequestSubmittedRepliedCount(request) >= CmppUtils
+					.extractRequestSubmittedCount(request)) {
+				returnQueuedDelivers(serviceNumber, null);
+				CmppUtils.cleanRequestSubmitteds(request);
+				if (testQueuedDelivers(serviceNumber)) {
+					this.doPostDeliver(request, response);
+				}
+			}
 		}
 	}
 
-	protected void validateClientSubmit(Submit submit, int signLen) throws Exception {
+	protected boolean testClientSubmitValid(Submit submit, int signLen) {
 		if ((submit.registeredDelivery == (byte) 1) && submit.destUserCount > 1) {
-			throw new IllegalArgumentException("Not to submit multiple subscriber numbers when report flag is on.");
+			return false;
 		}
 
-		for (int i = 0; i < submit.destUserCount; i++) {
-			if (!(UmspUtils.isPhoneNumberOfCM(submit.destTerminalIds[i])
-					|| UmspUtils.isPhoneNumberOfCT(submit.destTerminalIds[i]) || UmspUtils
-						.isPhoneNumberOfCU(submit.destTerminalIds[i])) || !submit.destTerminalIds[i].matches("\\d*")) {
-				throw new IllegalArgumentException(String.format("cann't submit invalidate number. number=%s",
-						submit.destTerminalIds[i]));
+		if (this.phoneNumberValidator != null) {
+			for (int i = 0; i < submit.destUserCount; i++) {
+				if (!submit.destTerminalIds[i].matches("\\d+")
+						|| !this.phoneNumberValidator.testValid(submit.destTerminalIds[i])) {
+					return false;
+				}
+			}
+		} else {
+			Log.warn("not found phone number validator");
+			for (int i = 0; i < submit.destUserCount; i++) {
+				if (!submit.destTerminalIds[i].matches("\\d+")) {
+					return false;
+				}
 			}
 		}
 
@@ -342,7 +360,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 		int cascadeOrder = submit.getMessageCascadeOrder();
 
 		if (cascadeCount > 0 && submit.msgFormat != MessageCodes.UCS2) {
-			throw new IllegalArgumentException("error message format, cascade message must be UC2 code");
+			return false;
 		}
 
 		signLen = signLen < 0 ? 0 : signLen;
@@ -356,10 +374,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 				maxMessageLen = Constants.SMS.MAX_SMS_CASCADEMSG_CONTENT - maxMessageLengthPlace - signLen;
 			}
 		}
-		if (message_context.length() > maxMessageLen) {
-			throw new IllegalArgumentException(String.format("error message length, length must less then equals %d",
-					maxMessageLen));
-		}
+		return message_context.length() <= maxMessageLen;
 	}
 
 	@Override
@@ -368,41 +383,58 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 		String serviceNumber = CmppUtils.extractRequestServiceNumber(request);
 		String serviceSign = CmppUtils.extractRequestServiceSignature(request);
 		int signLen = StringUtils.hasText(serviceSign) ? serviceSign.length() : 0;
-		
+
 		Submit submit = (Submit) CmppUtils.extractRequestPacket(request);
-		SubmitResponse resp = (SubmitResponse) this.context_smgp_packet_maps.get(Commands.CMPP_SUBMIT_RESP);
+		//大爷的， 就少这么一个clone...并发上去以后，发现回复好多重复SEQ。。。。
+		// 百思不得其解。。。。。两天时间查了整个代码才发现！！！
+		// 细节是魔鬼啊。童鞋们注意了。。。
+		SubmitResponse resp = (SubmitResponse) this.context_smgp_packet_maps.get(Commands.CMPP_SUBMIT_RESP).clone();
 		resp.protocolVersion = this.protocolVersion;
-		resp.sequenceId = CmppUtils.generateRequestSequence(request);
+		resp.sequenceId = submit.sequenceId;
+		
 		resp.nodeId = this.gatewayId;
 		resp.nodeTime = CalendarUtils.getTimestampInYearDuring(submit.createTimeMillis);
-		resp.nodeSeq = resp.sequenceId;
+		resp.nodeSeq = CmppUtils.generateContextSequence(request.getContext());
 		resp.result = 9;
+		
 		if (!StringUtils.hasText(submit.sourceId) || !submit.sourceId.startsWith(serviceNumber)) {
 			resp.result = 1;
 		} else {
+			boolean submit_valid = false;
 			try {
-				validateClientSubmit(submit, signLen);
-				if (signLen > 0) {
-					byte[] sign_bytes= UmspUtils.toGsmBytes(serviceNumber, submit.msgFormat);
-					ByteArrayBuffer message_content_buffer = new ByteArrayBuffer(submit.msgLength + sign_bytes.length);
-					message_content_buffer.put(submit.msgContent);
-					message_content_buffer.put(sign_bytes);
-					submit.msgContent = message_content_buffer.array();
-					submit.msgLength = message_content_buffer.length();
-				}
-				submit.setDataPacketId(UUID.randomUUID().toString());
-				// 复制应答的序列号
-				submit.nodeId = resp.nodeId;
-				submit.nodeTime = resp.nodeTime;
-				submit.nodeSeq = resp.nodeSeq;
-				// 分发客户端提交上来的发送请求
-				dispatchSubmit(submit);
-				resp.result = 0;
-			} catch (Exception e) {
-				resp.result = 1;
-				Log.warn(e.getMessage(), e);
+				submit_valid = testClientSubmitValid(submit, signLen);
 			} catch (Throwable e) {
-				Log.warn(e.getMessage(), e);
+				Log.warn(String.format("testClientSubmitValid error:" + e.getMessage()), e);
+				submit_valid = false;
+			}
+
+			if (submit_valid) {
+				try {
+					int cascade_count = submit.getMessageCascadeCount();
+					int cascade_order = submit.getMessageCascadeOrder();
+					if (signLen > 0 && cascade_order == cascade_count) {
+						byte[] sign_bytes = UmspUtils.toGsmBytes(serviceSign, submit.msgFormat);
+						ByteArrayBuffer message_content_buffer = new ByteArrayBuffer(submit.msgLength
+								+ sign_bytes.length);
+						message_content_buffer.put(submit.msgContent);
+						message_content_buffer.put(sign_bytes);
+						submit.msgContent = message_content_buffer.array();
+						submit.msgLength = message_content_buffer.length();
+					}
+					submit.setDataPacketId(UUID.randomUUID().toString());
+					// 复制应答的序列号
+					submit.nodeId = resp.nodeId;
+					submit.nodeTime = resp.nodeTime;
+					submit.nodeSeq = resp.nodeSeq;
+					submit.sequenceId = resp.sequenceId;
+					// 分发客户端提交上来的发送请求
+					dispatchSubmit(submit);
+					resp.result = 0;
+				} catch (Throwable e) {
+					Log.warn(e.getMessage(), e);
+				}
+			} else {
+				resp.result = 1;
 			}
 		}
 		CmppUtils.renderDataPacket(request, response, resp);

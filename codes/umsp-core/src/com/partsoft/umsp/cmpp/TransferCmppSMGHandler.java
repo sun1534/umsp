@@ -50,7 +50,17 @@ public class TransferCmppSMGHandler extends AbstractCmppSMGContextHandler {
 	protected ConnectResponse buildConnectResponse(final ConnectResponse resp, String remoteAddr, String enterpriseId,
 			String authenticationToken, int timestamp) {
 		resp.status = 2;
-		if (limitTrustRemoteAddr == false || clientInfoGetter.isRemoteAddrTrust(remoteAddr)) {
+		boolean truct_ip =false;
+		if (this.limitTrustRemoteAddr) {
+			if (clientInfoGetter.isMustCheckRemoteAddr(enterpriseId)) {
+				truct_ip = clientInfoGetter.isRemoteAddrTrust(remoteAddr);
+			} else {
+				truct_ip = true;
+			}
+		} else {
+			truct_ip = true;
+		}
+		if (truct_ip) {
 			String service_number = clientInfoGetter.getServiceNumber(enterpriseId);
 			if (Log.isDebugEnabled()) {
 				Log.debug(String.format("sp cid=%s, sp-num=%s", enterpriseId, service_number));

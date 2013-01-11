@@ -35,5 +35,37 @@ public abstract class Constants {
 
 		public static final int GBK = 15;
 	}
+	
+	public static class LineTypes {
 
+		// 移动
+		public static final int CMPP = 1;
+
+		// 电信
+		public static final int SMGP = 2;
+
+		// 联通
+		public static final int SGIP = 3;
+		
+		//未知
+		public static final int UNKN = 0;
+
+	}
+	
+
+	public static class LineProtocols {
+		//移动
+		public static final String CMPP = com.partsoft.umsp.cmpp.Constants.PROTOCOL_NAME;  
+		
+		// 电信
+		public static final String SMGP = com.partsoft.umsp.smgp.Constants.PROTOCOL_NAME;
+
+		// 联通
+		public static final String SGIP = com.partsoft.umsp.sgip.Constants.PROTOCOL_NAME;
+		
+		// 未知
+		public static final String UNKN = "UNKN";
+		
+	}
+	
 }

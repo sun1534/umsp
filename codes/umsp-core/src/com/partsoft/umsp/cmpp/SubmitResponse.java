@@ -42,9 +42,9 @@ public class SubmitResponse extends CmppDataPacket {
 		super.readDataInput(in);
 		long temp_msgid = in.readLong();
 		
-		nodeId = CmppUtils.getNodeIdFromMsgID(temp_msgid);
-		nodeTime = CmppUtils.getNodeTimeFromMsgID(temp_msgid);
-		nodeSeq = CmppUtils.getSequenceIdFromMsgID(temp_msgid);
+		nodeId = CmppUtils.extractNodeIdFromMsgID(temp_msgid);
+		nodeTime = CmppUtils.extractNodeTimeFromMsgID(temp_msgid);
+		nodeSeq = CmppUtils.extractNodeSeqFromMsgID(temp_msgid);
 		
 		if (protocolVersion == Constants.VERSION3) {
 			this.result = in.readInt();
