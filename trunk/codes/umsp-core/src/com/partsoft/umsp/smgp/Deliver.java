@@ -140,7 +140,11 @@ public class Deliver extends SmgpTlvDataPacket {
 	}
 	
 	public void setTp_udhi(byte value) {
-		setDynamicProperty(TlvTags.TP_udhi, new byte[]{value});
+		if (value != 0) {
+			setDynamicProperty(TlvTags.TP_udhi, new byte[]{value});
+		} else {
+			removeDynamicProperty(TlvTags.TP_udhi);
+		}
 	}
 	
 	public byte getTp_pid() {
@@ -148,7 +152,11 @@ public class Deliver extends SmgpTlvDataPacket {
 	}
 	
 	public void setTp_pid(byte value) {
-		setDynamicProperty(TlvTags.TP_udhi, new byte[]{value});
+		if (value != 0) {
+			setDynamicProperty(TlvTags.TP_udhi, new byte[]{value});
+		} else {
+			removeDynamicProperty(TlvTags.TP_udhi);
+		}
 	}
 
 
@@ -181,7 +189,7 @@ public class Deliver extends SmgpTlvDataPacket {
 	}
 	
 	public void setSrcTermType(byte value) {
-		if (value > 0) {
+		if (value != 0) {
 			setDynamicProperty(TlvTags.LinkID, new byte[]{value});
 		} else {
 			removeDynamicProperty(TlvTags.LinkID);

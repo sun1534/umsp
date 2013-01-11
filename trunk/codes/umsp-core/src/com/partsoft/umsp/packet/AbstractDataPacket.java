@@ -10,6 +10,22 @@ import com.partsoft.umsp.DataPacket;
 
 @SuppressWarnings("serial")
 public abstract class AbstractDataPacket implements DataPacket, Serializable, Cloneable {
+	
+	public String srev1;
+	
+	public String srev2;
+	
+	public String srev3;
+	
+	public String srev4;
+	
+	public String srev5;
+	
+	public int irev1;
+	
+	public int irev2;
+	
+	public int irev3;
 
 	protected String dataPacketId = UUID.randomUUID().toString();
 

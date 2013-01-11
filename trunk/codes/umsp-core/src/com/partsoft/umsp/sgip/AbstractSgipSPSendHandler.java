@@ -148,7 +148,7 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 				sb.corporation_id = enterprise_id;
 				SgipUtils.stuffSerialNumber(sb, request, node_id, sb.createTimeMillis);
 				sb.node_id = node_id;
-				sb.timestamp = CalendarUtils.getTimestampInYearDuring(System.currentTimeMillis());
+				sb.timestamp = CalendarUtils.getTimestampInYearDuring(sb.createTimeMillis);
 				sb.sequence = SgipUtils.generateRequestSequence(request);
 
 				int transmit_listener_size = ListUtils.size(transmitListener);
@@ -206,16 +206,6 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 			int last_pare_submit_index = SgipUtils.extractRequestSubmittedRepliedCount(request);
 			List<Submit> posts = SgipUtils.extractRequestSubmitteds(request);
 			SgipUtils.updateSubmittedRepliedCount(request, last_pare_submit_index + 1);
-			if (SgipUtils.extractRequestSubmittedRepliedCount(request) == SgipUtils
-					.extractRequestSubmittedCount(request)) {
-				returnQueuedSubmits(null);
-				SgipUtils.cleanRequestSubmitteds(request);
-				if (testQueuedSubmits()) {
-					this.doPostSubmit(request, response);
-				} else {
-					do_unbind = isAutoReSubmit() ? false : true;
-				}
-			}
 			Submit submitted = posts.get(last_pare_submit_index);
 			int transmit_listener_size = ListUtils.size(transmitListener);
 			if (transmit_listener_size > 0) {
@@ -227,6 +217,16 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 					} catch (Throwable e) {
 						Log.ignore(e);
 					}
+				}
+			}
+			if (SgipUtils.extractRequestSubmittedRepliedCount(request) >= SgipUtils
+					.extractRequestSubmittedCount(request)) {
+				returnQueuedSubmits(null);
+				SgipUtils.cleanRequestSubmitteds(request);
+				if (testQueuedSubmits()) {
+					this.doPostSubmit(request, response);
+				} else {
+					do_unbind = isAutoReSubmit() ? false : true;
 				}
 			}
 		} else {

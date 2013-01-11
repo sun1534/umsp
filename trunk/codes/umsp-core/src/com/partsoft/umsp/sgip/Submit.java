@@ -186,6 +186,23 @@ public class Submit extends SgipDataPacket {
 	public void setMessageContent(String msg) {
 		setMessageContent(msg, MessageCodes.UCS2);
 	}
+	
+	public String getUserNumbersTrimCNPrefix() {
+		StringBuffer buffer = new StringBuffer(this.user_count * 21);
+		boolean appended = false;
+		for (int i = 0; i < this.user_count; i++) {
+			if (appended)
+				buffer.append(",");
+			else
+				appended = true;
+			if (user_number[i].startsWith("86")) {
+				buffer.append(user_number[i].substring(2));
+			} else {
+				buffer.append(user_number[i]);
+			}
+		}
+		return buffer.toString();
+	}
 
 	public String getUserNumbers() {
 		StringBuffer buffer = new StringBuffer(this.user_count * 21);

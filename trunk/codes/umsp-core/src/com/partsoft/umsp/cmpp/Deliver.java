@@ -105,9 +105,9 @@ public class Deliver extends CmppDataPacket {
 
 		long temp_msg_id = in.readLong();
 
-		this.nodeId = CmppUtils.getNodeIdFromMsgID(temp_msg_id);
-		this.nodeTime = CmppUtils.getNodeTimeFromMsgID(temp_msg_id);
-		this.nodeSeq = CmppUtils.getSequenceIdFromMsgID(temp_msg_id);
+		this.nodeId = CmppUtils.extractNodeIdFromMsgID(temp_msg_id);
+		this.nodeTime = CmppUtils.extractNodeTimeFromMsgID(temp_msg_id);
+		this.nodeSeq = CmppUtils.extractNodeSeqFromMsgID(temp_msg_id);
 
 		this.destId = readFixedString(in, 21);
 		this.serviceId = readFixedString(in, 10);

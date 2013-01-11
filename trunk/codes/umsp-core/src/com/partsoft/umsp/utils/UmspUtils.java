@@ -2,11 +2,45 @@ package com.partsoft.umsp.utils;
 
 import java.io.UnsupportedEncodingException;
 
+import com.partsoft.umsp.Constants.LineProtocols;
+import com.partsoft.umsp.Constants.LineTypes;
 import com.partsoft.umsp.Constants.MessageCodes;
 import com.partsoft.umsp.io.ByteArrayBuffer;
 import com.partsoft.utils.StringUtils;
 
 public class UmspUtils {
+	
+	public static String lineType2Protocol(int type) {
+		String protocol_result = null;
+		switch (type) {
+		case 1:
+			protocol_result = LineProtocols.CMPP;
+			break;
+		case 2:
+			protocol_result = LineProtocols.SMGP;
+			break;
+		case 3:
+			protocol_result = LineProtocols.SGIP;
+			break;
+		default:
+			protocol_result = LineProtocols.UNKN;
+			break;
+		}
+		return protocol_result;
+	}
+	
+	public static int lineProtocol2Type(String protocol) {
+		int line_type_result = LineTypes.UNKN;
+		if (LineProtocols.CMPP.equalsIgnoreCase(protocol)) {
+			line_type_result = LineTypes.CMPP;
+		} else if (LineProtocols.SMGP.equalsIgnoreCase(protocol)) {
+			line_type_result = LineTypes.SMGP;
+		} else if (LineProtocols.SGIP.equalsIgnoreCase(protocol)) {
+			line_type_result = LineTypes.SGIP;
+		}
+		return line_type_result;
+	}
+	
 
 	public static byte[] string2FixedBytes(String s, int fixLength) {
 		ByteArrayBuffer resultBuffer = new ByteArrayBuffer(fixLength);
@@ -130,6 +164,7 @@ public class UmspUtils {
 	 * @param userNumber
 	 * @return
 	 */
+	@Deprecated
 	public static boolean isPhoneNumberOfCM(String userNumber) {
 		userNumber = UmspUtils.getStandardPhoneNumberOfCN(userNumber);
 		return userNumber.startsWith("86134") || userNumber.startsWith("86135") || userNumber.startsWith("86136")
@@ -146,6 +181,7 @@ public class UmspUtils {
 	 * @param userNumber
 	 * @return
 	 */
+	@Deprecated
 	public static boolean isPhoneNumberOfCU(String userNumber) {
 		userNumber = UmspUtils.getStandardPhoneNumberOfCN(userNumber);
 		return userNumber.startsWith("86130") || userNumber.startsWith("86131") || userNumber.startsWith("86132")
@@ -159,12 +195,14 @@ public class UmspUtils {
 	 * @param userNumber
 	 * @return
 	 */
+	@Deprecated
 	public static boolean isPhoneNumberOfCT(String userNumber) {
 		userNumber = UmspUtils.getStandardPhoneNumberOfCN(userNumber);
 		return userNumber.startsWith("86133") || userNumber.startsWith("86153") || userNumber.startsWith("86180")
 				|| userNumber.startsWith("86189");
 	}
 
+	@Deprecated
 	public static String getSmsProtocolPrefixByPhoneNumber(String userNumber) throws IllegalArgumentException {
 		String protocal_name = null;
 		if (isPhoneNumberOfCT(userNumber)) {
@@ -178,7 +216,7 @@ public class UmspUtils {
 		}
 		return protocal_name;
 	}
-
+	
 	public static String getStandardPhoneNumberOfCN(String userNumber) {
 		if (userNumber.startsWith("01")) {
 			userNumber = userNumber.substring(1);

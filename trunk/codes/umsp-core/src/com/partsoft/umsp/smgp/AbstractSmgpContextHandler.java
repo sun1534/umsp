@@ -17,7 +17,7 @@ import com.partsoft.utils.Assert;
 
 public abstract class AbstractSmgpContextHandler extends AbstractContextHandler implements Handler {
 
-	protected static final Map<Integer, SmgpDataPacket> smgp_packet_maps = new HashMap<Integer, SmgpDataPacket>(10);
+	private static final Map<Integer, SmgpDataPacket> smgp_packet_maps = new HashMap<Integer, SmgpDataPacket>(10);
 
 	static {
 		addSmgpCommands(new Login());
@@ -36,7 +36,7 @@ public abstract class AbstractSmgpContextHandler extends AbstractContextHandler 
 		addSmgpCommands(new ExitResponse());
 	}
 
-	private Map<Integer, SmgpDataPacket> context_smgp_packet_maps;
+	protected Map<Integer, SmgpDataPacket> context_smgp_packet_maps;
 
 	protected static void addSmgpCommands(SmgpDataPacket packet) {
 		smgp_packet_maps.put(packet.getRequestId(), packet);
@@ -68,15 +68,16 @@ public abstract class AbstractSmgpContextHandler extends AbstractContextHandler 
 
 	protected void doActiveTest(Request request, Response response) throws IOException {
 		Assert.isTrue(SmgpUtils.testRequestBinded(request));
-		ActiveTestResponse test_response = ((ActiveTestResponse) smgp_packet_maps.get(RequestIDs.active_test_resp))
+		ActiveTest active_test = (ActiveTest) SmgpUtils.extractRequestPacket(request);
+		ActiveTestResponse test_response = ((ActiveTestResponse) this.context_smgp_packet_maps.get(RequestIDs.active_test_resp))
 				.clone();
-		test_response.sequenceId = SmgpUtils.generateRequestSequence(request);
+		test_response.sequenceId = active_test.sequenceId;
 		SmgpUtils.renderDataPacket(request, response, test_response);
 		response.flushBuffer();
 	}
 
 	protected void doActiveTestRequest(Request request, Response response) throws IOException {
-		ActiveTest test = ((ActiveTest) smgp_packet_maps.get(RequestIDs.active_test)).clone();
+		ActiveTest test = ((ActiveTest) this.context_smgp_packet_maps.get(RequestIDs.active_test)).clone();
 		test.sequenceId = SmgpUtils.generateRequestSequence(request);
 		SmgpUtils.renderDataPacket(request, response, test);
 		response.flushBuffer();
@@ -91,8 +92,9 @@ public abstract class AbstractSmgpContextHandler extends AbstractContextHandler 
 	}
 
 	protected void doUnBind(Request request, Response response) throws IOException {
-		ExitResponse exit_res = (ExitResponse) smgp_packet_maps.get(RequestIDs.exit_resp).clone();
-		exit_res.sequenceId = SmgpUtils.generateRequestSequence(request);
+		Exit exit = (Exit) SmgpUtils.extractRequestPacket(request);
+		ExitResponse exit_res = (ExitResponse) this.context_smgp_packet_maps.get(RequestIDs.exit_resp).clone();
+		exit_res.sequenceId = exit.sequenceId;
 		SmgpUtils.renderDataPacket(request, response, exit_res);
 		response.finalBuffer();
 	}

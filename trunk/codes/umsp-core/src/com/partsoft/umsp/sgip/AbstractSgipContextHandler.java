@@ -18,7 +18,7 @@ import com.partsoft.utils.Assert;
 public abstract class AbstractSgipContextHandler extends AbstractContextHandler
 		implements Handler {
 
-	protected static final Map<Integer, SgipDataPacket> sgip_packet_maps = new HashMap<Integer, SgipDataPacket>(
+	private static final Map<Integer, SgipDataPacket> sgip_packet_maps = new HashMap<Integer, SgipDataPacket>(
 			10);
 
 	static {

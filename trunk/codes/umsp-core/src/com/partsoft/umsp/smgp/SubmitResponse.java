@@ -44,11 +44,11 @@ public class SubmitResponse extends SmgpDataPacket {
 		byte[] msg_id_bytes = new byte[10];
 		in.readFully(msg_id_bytes, 0, msg_id_bytes.length);
 		int index = 0;
-		NodeId = HexUtils.intFromHex(HexUtils.toHex(msg_id_bytes, index, 3));
+		NodeId = Integer.parseInt(HexUtils.toHex(msg_id_bytes, index, 3));
 		index += 3;
-		NodeTime = HexUtils.intFromHex(HexUtils.toHex(msg_id_bytes, index, 4));
+		NodeTime = Integer.parseInt(HexUtils.toHex(msg_id_bytes, index, 4));
 		index += 4;
-		NodeSequenceId = HexUtils.intFromHex(HexUtils.toHex(msg_id_bytes, index, 3));
+		NodeSequenceId = Integer.parseInt(HexUtils.toHex(msg_id_bytes, index, 3));
 		Status = in.readInt();
 	}
 	

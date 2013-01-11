@@ -69,9 +69,14 @@ public abstract class CmppUtils {
 	public static final String ARG_REQUEST_BINDED = "cmpp.user.binded";
 
 	/**
-	 * 序列号参数
+	 * 上下文序列号参数
 	 */
-	public static final String ARG_REQUEST_SEQUENCE = "cmpp.context.sequence";
+	public static final String ARG_CONTEXT_SEQUENCE = "cmpp.context.sequence";
+
+	/**
+	 * 请求序列号参数
+	 */
+	public static final String ARG_REQUEST_SEQUENCE = "cmpp.request.sequence";
 
 	/**
 	 * 已提交服务器的消息列表
@@ -98,17 +103,17 @@ public abstract class CmppUtils {
 	 */
 	public static final String ARG_PROTOCOL_VERSION = "cmpp.protocol.version";
 
-	public static int getNodeTimeFromMsgID(long msgid) {
+	public static int extractNodeTimeFromMsgID(long msgid) {
 		long temp = (msgid >>> 38) & (long) 0x7FFFFFFFFFL;
 		return (int) ((temp & 0x3F) + ((temp >>> 6) & 0x3F) * 100 + ((temp >>> 12) & 0x1F) * 10000
 				+ ((temp >>> 17) & 0x1F) * 1000000 + ((temp >>> 22) & 0x0F) * 100000000);
 	}
 
-	public static int getNodeIdFromMsgID(long msgid) {
-		return (int) ((msgid >>> 16) & 0x3FFFFF);
+	public static int extractNodeIdFromMsgID(long msgid) {
+		return (int) (((long) (msgid >>> 16) & 0x3FFFFF));
 	}
 
-	public static int getSequenceIdFromMsgID(long msgid) {
+	public static int extractNodeSeqFromMsgID(long msgid) {
 		return (int) (msgid & 0xFFFF);
 	}
 
@@ -123,7 +128,7 @@ public abstract class CmppUtils {
 
 		result = (second_value & 0x3F) | ((minute_value & 0x3F) << 6) | ((hours_value & 0x1F) << 12)
 				| (((day_value & 0x1F)) << 17) | ((month_value & 0x0F) << 22);
-		return (result << 38) | ((node_id & 0x3FFFFF) << 16) | (seq & 0xFFFF);
+		return (result << 38) | (((long) (node_id & 0x3FFFFF) << 16)) | (seq & 0xFFFF);
 	}
 
 	public static String generateClientToken(String clientid, String sharedSecret, int timestamp) {
@@ -391,20 +396,36 @@ public abstract class CmppUtils {
 	 * 
 	 * @return
 	 */
-	public static int generateRequestSequence(Request request) {
+	public static int generateContextSequence(Context context) {
 		int result = 1;
-		Context context = request.getContext();
 		synchronized (context) {
-			Integer seq = (Integer) context.getAttribute(ARG_REQUEST_SEQUENCE);
+			Integer seq = (Integer) context.getAttribute(ARG_CONTEXT_SEQUENCE);
 			if (seq == null) {
-				seq = 1;
+				seq = 0;
 			}
-			seq++;
-			if (seq++ >= Integer.MAX_VALUE) {
+			seq = seq + 1;
+			if (seq >= 0xFFFF) {
 				seq = 1;
 			}
 			result = seq;
-			context.setAttribute(ARG_REQUEST_SEQUENCE, seq);
+			context.setAttribute(ARG_CONTEXT_SEQUENCE, seq);
+		}
+		return result;
+	}
+
+	public static int generateRequestSequence(Request request) {
+		int result = 1;
+		synchronized (request) {
+			Integer seq = (Integer) request.getAttribute(ARG_CONTEXT_SEQUENCE);
+			if (seq == null) {
+				seq = 0;
+			}
+			seq = seq + 1;
+			if (seq >= Integer.MAX_VALUE) {
+				seq = 1;
+			}
+			result = seq;
+			request.setAttribute(ARG_CONTEXT_SEQUENCE, seq);
 		}
 		return result;
 	}

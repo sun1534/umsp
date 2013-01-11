@@ -75,9 +75,10 @@ public abstract class AbstractCmppContextHandler extends AbstractContextHandler 
 
 	protected void doActiveTest(Request request, Response response) throws IOException {
 		Assert.isTrue(CmppUtils.testRequestBinded(request));
+		ActiveTest active_test = (ActiveTest) CmppUtils.extractRequestPacket(request);
 		ActiveTestResponse test_response = ((ActiveTestResponse) this.context_smgp_packet_maps
 				.get(Commands.CMPP_ACTIVE_TEST_RESP)).clone();
-		test_response.sequenceId = CmppUtils.generateRequestSequence(request);
+		test_response.sequenceId = active_test.sequenceId;
 		CmppUtils.renderDataPacket(request, response, test_response);
 		response.flushBuffer();
 	}
@@ -101,9 +102,10 @@ public abstract class AbstractCmppContextHandler extends AbstractContextHandler 
 
 	protected void doUnBind(Request request, Response response) throws IOException {
 		Assert.isTrue(CmppUtils.testRequestBinded(request));
+		Terminate terminate = (Terminate) CmppUtils.extractRequestPacket(request);
 		TerminateResponse exit_res = (TerminateResponse) this.context_smgp_packet_maps
 				.get(Commands.CMPP_TERMINATE_RESP).clone();
-		exit_res.sequenceId = CmppUtils.generateRequestSequence(request);
+		exit_res.sequenceId = terminate.sequenceId;
 		CmppUtils.renderDataPacket(request, response, exit_res);
 		response.finalBuffer();
 	}
