@@ -26,22 +26,22 @@ public abstract class SgipUtils {
 	/**
 	 * 流量控制最后计数
 	 */
-	public static final String ARG_FLOW_TOTAL = "cmp.flow.total";
+	public static final String ARG_FLOW_TOTAL = "sgip.flow.total";
 
 	/**
 	 * 流量控制最后记录时间
 	 */
-	public static final String ARG_FLOW_LASTTIME = "cmp.flow.lasttime";
+	public static final String ARG_FLOW_LASTTIME = "sgip.flow.lasttime";
 
 	/**
 	 * 服务号码
 	 */
-	public static final String ARG_SERVICE_NUMBER = "cmpp.service.number";
+	public static final String ARG_SERVICE_NUMBER = "sgip.service.number";
 
 	/**
 	 * 服务签名
 	 */
-	public static final String ARG_SERVICE_SIGN = "cmpp.service.sign";
+	public static final String ARG_SERVICE_SIGN = "sgip.service.sign";
 	
 	/**
 	 * 输出流参数
@@ -66,7 +66,7 @@ public abstract class SgipUtils {
 	/**
 	 * 序列号参数
 	 */
-	public static final String ARG_REQUEST_SEQUENCE = "sgip.context.sequence";
+	public static final String ARG_REQUEST_SEQUENCE = "sgip.request.sequence";
 
 	/**
 	 * 已提交服务器的消息列表

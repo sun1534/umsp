@@ -10,6 +10,8 @@ import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.springframework.util.StringUtils;
+
 import com.partsoft.umsp.Client;
 import com.partsoft.umsp.Context;
 import com.partsoft.umsp.Request;
@@ -31,12 +33,18 @@ public abstract class CmppUtils {
 	/**
 	 * 流量控制最后计数
 	 */
-	public static final String ARG_FLOW_TOTAL = "cmp.flow.total";
+	public static final String ARG_FLOW_TOTAL = "cmpp.flow.total";
 
 	/**
 	 * 流量控制最后记录时间
 	 */
-	public static final String ARG_FLOW_LASTTIME = "cmp.flow.lasttime";
+	public static final String ARG_FLOW_LASTTIME = "cmpp.flow.lasttime";
+	
+	
+	/**
+	 * 请求连接数统计前缀
+	 */
+	public static final String ARG_REQUEST_CONNS = "cmpp.conns.";
 
 	/**
 	 * 服务号码
@@ -416,7 +424,7 @@ public abstract class CmppUtils {
 	public static int generateRequestSequence(Request request) {
 		int result = 1;
 		synchronized (request) {
-			Integer seq = (Integer) request.getAttribute(ARG_CONTEXT_SEQUENCE);
+			Integer seq = (Integer) request.getAttribute(ARG_REQUEST_SEQUENCE);
 			if (seq == null) {
 				seq = 0;
 			}
@@ -425,7 +433,7 @@ public abstract class CmppUtils {
 				seq = 1;
 			}
 			result = seq;
-			request.setAttribute(ARG_CONTEXT_SEQUENCE, seq);
+			request.setAttribute(ARG_REQUEST_SEQUENCE, seq);
 		}
 		return result;
 	}
@@ -628,7 +636,7 @@ public abstract class CmppUtils {
 	public static String extractRequestServiceNumber(Request request) {
 		return (String) request.getAttribute(ARG_SERVICE_NUMBER);
 	}
-
+	
 	public static String extractRequestServiceSignature(Request request) {
 		return (String) request.getAttribute(ARG_SERVICE_SIGN);
 	}
@@ -647,5 +655,62 @@ public abstract class CmppUtils {
 		Integer result = (Integer) request.getAttribute(ARG_FLOW_TOTAL);
 		return result == null ? 0 : result;
 	}
+	
+	public static int extractRequestConnectionTotal(Request request, String serviceNumber) {
+		String arg_params;
+		Integer conns_total = 0;
+		if (!StringUtils.hasText(serviceNumber)) {
+			arg_params = ARG_REQUEST_CONNS + "0000";
+		} else { 
+			arg_params = ARG_REQUEST_CONNS + serviceNumber;
+		}
+		Context context = request.getContext();
+		synchronized (context) {
+			conns_total = (Integer) context.getAttribute(arg_params);
+		}
+		return conns_total == null ? 0 : conns_total.intValue();
+	}
+	
+	public static void stepIncreaseRequestConnection(Request request, String serviceNumber) {
+		String arg_params;
+		Integer conns_total = 0;
+		if (!StringUtils.hasText(serviceNumber)) {
+			arg_params = ARG_REQUEST_CONNS + "0000";
+		} else { 
+			arg_params = ARG_REQUEST_CONNS + serviceNumber;
+		}
+		Context context = request.getContext();
+		synchronized (context) {
+			conns_total = (Integer) context.getAttribute(arg_params);
+			conns_total = conns_total == null ? 0 : conns_total;
+			if (conns_total < 0) { 
+				conns_total = 0;
+			}
+			conns_total = conns_total + 1;
+			context.setAttribute(arg_params, conns_total);
+		}
+	}
+	
+	
+	public static void stepDecrementRequestConnection(Request request, String serviceNumber) {
+		String arg_params;
+		Integer conns_total = 0;
+		if (!StringUtils.hasText(serviceNumber)) {
+			arg_params = ARG_REQUEST_CONNS + "0000";
+		} else { 
+			arg_params = ARG_REQUEST_CONNS + serviceNumber;
+		}
+		Context context = request.getContext();
+		synchronized (context) {
+			conns_total = (Integer) context.getAttribute(arg_params);
+			conns_total = conns_total == null ? 0 : conns_total - 1;
+			if (conns_total <= 0) { 
+				context.removeAttribute(arg_params);
+			} else {
+				context.setAttribute(arg_params, conns_total);
+			}
+		}
+	}
+	
 
 }

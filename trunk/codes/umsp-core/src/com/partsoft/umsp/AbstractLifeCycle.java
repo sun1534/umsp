@@ -22,7 +22,9 @@ public abstract class AbstractLifeCycle implements LifeCycle {
 					return;
 				setStarting();
 				doStart();
-				Log.debug(String.format("started %s", this.getClass().getName()));
+				if (Log.isDebugEnabled()) {
+					Log.debug(String.format("started %s", this.getClass().getName()));
+				}
 				setStarted();
 			} catch (Exception e) {
 				setFailed(e);
@@ -41,7 +43,9 @@ public abstract class AbstractLifeCycle implements LifeCycle {
 					return;
 				setStopping();
 				doStop();
-				Log.debug(String.format("stopped %s", this.getClass().getName()));
+				if (Log.isDebugEnabled()) {
+					Log.debug(String.format("stopped %s", this.getClass().getName()));
+				}
 				setStopped();
 			} catch (Exception e) {
 				setFailed(e);
@@ -123,7 +127,7 @@ public abstract class AbstractLifeCycle implements LifeCycle {
 
 	private void setFailed(Throwable th) {
 		Log.warn("failed " + this + ": " + th);
-		Log.debug(th);
+		if (Log.isDebugEnabled()) Log.debug(th);
 		_state = FAILED;
 		if (_listeners != null) {
 			for (int i = 0; i < _listeners.length; i++) {

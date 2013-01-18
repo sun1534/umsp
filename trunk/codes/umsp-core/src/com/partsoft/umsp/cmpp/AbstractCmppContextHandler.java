@@ -37,7 +37,7 @@ public abstract class AbstractCmppContextHandler extends AbstractContextHandler 
 		addCmppCommands(new TerminateResponse());
 	}
 
-	protected Map<Integer, CmppDataPacket> context_smgp_packet_maps;
+	protected Map<Integer, CmppDataPacket> context_cmpp_packet_maps;
 
 	protected static void addCmppCommands(CmppDataPacket packet) {
 		cmpp_packet_maps.put(packet.getCommandId(), packet);
@@ -48,9 +48,9 @@ public abstract class AbstractCmppContextHandler extends AbstractContextHandler 
 	@Override
 	protected void doStart() throws Exception {
 		super.doStart();
-		context_smgp_packet_maps = Collections.unmodifiableMap(new HashMap<Integer, CmppDataPacket>(cmpp_packet_maps));
+		context_cmpp_packet_maps = Collections.unmodifiableMap(new HashMap<Integer, CmppDataPacket>(cmpp_packet_maps));
 		// 设置版本号
-		for (CmppDataPacket packet : context_smgp_packet_maps.values()) {
+		for (CmppDataPacket packet : context_cmpp_packet_maps.values()) {
 			packet.protocolVersion = this.protocolVersion;
 		}
 	}
@@ -58,7 +58,7 @@ public abstract class AbstractCmppContextHandler extends AbstractContextHandler 
 	@Override
 	protected void doStop() throws Exception {
 		super.doStop();
-		context_smgp_packet_maps = null;
+		context_cmpp_packet_maps = null;
 	}
 
 	public AbstractCmppContextHandler() {
@@ -76,7 +76,7 @@ public abstract class AbstractCmppContextHandler extends AbstractContextHandler 
 	protected void doActiveTest(Request request, Response response) throws IOException {
 		Assert.isTrue(CmppUtils.testRequestBinded(request));
 		ActiveTest active_test = (ActiveTest) CmppUtils.extractRequestPacket(request);
-		ActiveTestResponse test_response = ((ActiveTestResponse) this.context_smgp_packet_maps
+		ActiveTestResponse test_response = ((ActiveTestResponse) this.context_cmpp_packet_maps
 				.get(Commands.CMPP_ACTIVE_TEST_RESP)).clone();
 		test_response.sequenceId = active_test.sequenceId;
 		CmppUtils.renderDataPacket(request, response, test_response);
@@ -84,7 +84,7 @@ public abstract class AbstractCmppContextHandler extends AbstractContextHandler 
 	}
 
 	protected void doActiveTestRequest(Request request, Response response) throws IOException {
-		ActiveTest test = ((ActiveTest) this.context_smgp_packet_maps.get(Commands.CMPP_ACTIVE_TEST)).clone();
+		ActiveTest test = ((ActiveTest) this.context_cmpp_packet_maps.get(Commands.CMPP_ACTIVE_TEST)).clone();
 		test.sequenceId = CmppUtils.generateRequestSequence(request);
 		CmppUtils.renderDataPacket(request, response, test);
 		response.flushBuffer();
@@ -93,6 +93,7 @@ public abstract class AbstractCmppContextHandler extends AbstractContextHandler 
 	protected void doActiveTestResponse(Request request, Response response) throws IOException {
 		Assert.isTrue(CmppUtils.testRequestBinded(request));
 		ActiveTestResponse test_response = (ActiveTestResponse) CmppUtils.extractRequestPacket(request);
+		if (Log.isDebugEnabled()) 
 		Log.debug(test_response.toString());
 	}
 
@@ -103,7 +104,7 @@ public abstract class AbstractCmppContextHandler extends AbstractContextHandler 
 	protected void doUnBind(Request request, Response response) throws IOException {
 		Assert.isTrue(CmppUtils.testRequestBinded(request));
 		Terminate terminate = (Terminate) CmppUtils.extractRequestPacket(request);
-		TerminateResponse exit_res = (TerminateResponse) this.context_smgp_packet_maps
+		TerminateResponse exit_res = (TerminateResponse) this.context_cmpp_packet_maps
 				.get(Commands.CMPP_TERMINATE_RESP).clone();
 		exit_res.sequenceId = terminate.sequenceId;
 		CmppUtils.renderDataPacket(request, response, exit_res);
@@ -202,7 +203,7 @@ public abstract class AbstractCmppContextHandler extends AbstractContextHandler 
 			in.mark(Buffer.INT_SIZE);
 			int command = in.readInt();
 			in.reset();
-			CmppDataPacket packet = context_smgp_packet_maps.get(command);
+			CmppDataPacket packet = context_cmpp_packet_maps.get(command);
 			if (packet != null) {
 				packet = packet.clone();
 				packet.readExternal(in);

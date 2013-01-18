@@ -149,7 +149,7 @@ public class PacketParser implements Parser {
 						}
 					}
 				} catch (IOException e) {
-					Log.debug(e);
+					if (Log.isDebugEnabled()) Log.debug(e);
 					ioex = e;
 					filled = -1;
 				}

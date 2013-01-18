@@ -2,6 +2,9 @@ package com.partsoft.umsp;
 
 import com.partsoft.umsp.handler.AbstractOriginHandler;
 import com.partsoft.umsp.packet.PacketClientConnector;
+import com.partsoft.umsp.thread.QueuedThreadPool;
+import com.partsoft.utils.Assert;
+import com.partsoft.utils.StringUtils;
 
 public final class Client extends AbstractOriginHandler implements Attributes, OriginHandler {
 
@@ -16,9 +19,14 @@ public final class Client extends AbstractOriginHandler implements Attributes, O
 	protected long _reConnectIntervalTime = 3000;
 
 	/**
-	 * 连接超时时间，单位：毫秒，默认值6秒
+	 * 连接超时时间，单位：毫秒，默认值1秒
 	 */
-	protected int connectTimeout = 1500;
+	protected int connectTimeout = 1000;
+	
+	/**
+	 * 数据读取超时
+	 */
+	protected int maxIdleTime = 500;
 
 	/**
 	 * @brief 最大连接发起数
@@ -73,6 +81,14 @@ public final class Client extends AbstractOriginHandler implements Attributes, O
 	public int getMaxConnection() {
 		return _maxConnection;
 	}
+	
+	public void setMaxIdleTime(int maxIdleTime) {
+		this.maxIdleTime = maxIdleTime;
+	}
+	
+	public int getMaxIdleTime() {
+		return maxIdleTime;
+	}
 
 	public int getConnectTimeout() {
 		return connectTimeout;
@@ -95,6 +111,7 @@ public final class Client extends AbstractOriginHandler implements Attributes, O
 	}
 
 	public void setMaxConnection(int maxConnection) {
+		Assert.isTrue(maxConnection > 0);
 		this._maxConnection = maxConnection;
 	}
 
@@ -132,8 +149,11 @@ public final class Client extends AbstractOriginHandler implements Attributes, O
 					if (getConnectTimeout() != packet_connector.getConnectTimeout()) {
 						packet_connector.setConnectTimeout(getConnectTimeout());
 					}
-					if (getConnectTimeout() != packet_connector.getMaxIdleTime()) {
-						packet_connector.setMaxIdleTime(getConnectTimeout());
+					if (getMaxIdleTime() != packet_connector.getMaxIdleTime()) {
+						packet_connector.setMaxIdleTime(getMaxIdleTime());
+					}
+					if (getMaxIdleTime() != packet_connector.getLowResourceMaxIdleTime()) {
+						packet_connector.setLowResourceMaxIdleTime(getMaxIdleTime());
 					}
 				}
 			}
@@ -147,6 +167,12 @@ public final class Client extends AbstractOriginHandler implements Attributes, O
 		}
 		updateConnectorParamers();
 		super.doStart();
+		if (this.getThreadPool() instanceof QueuedThreadPool) {
+			((QueuedThreadPool) this.getThreadPool()).setMaxThreads(getMaxConnection() + 1);
+			if (StringUtils.hasText(getProtocol())) {
+				((QueuedThreadPool) this.getThreadPool()).setName(getProtocol());
+			}
+		}
 	}
 
 }

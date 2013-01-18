@@ -111,7 +111,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 	protected final void doBind(Request request, Response response) throws IOException {
 		super.doBind(request, response);
 		Connect bind = (Connect) CmppUtils.extractRequestPacket(request);
-		ConnectResponse resp = (ConnectResponse) context_smgp_packet_maps.get(Commands.CMPP_CONNECT_RESP).clone();
+		ConnectResponse resp = (ConnectResponse) context_cmpp_packet_maps.get(Commands.CMPP_CONNECT_RESP).clone();
 		resp.sequenceId = bind.sequenceId;
 		resp.status = 5;
 		if (resp.protocolVersion < bind.protocolVersion) {
@@ -129,9 +129,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 				CmppUtils.setupRequestServiceSignature(request, requestServiceSign);
 				if (StringUtils.hasText(requestServiceNumber)) {
 					CmppUtils.setupRequestServiceNumber(request, requestServiceNumber);
-					Integer request_connected = (Integer) request.getContext().getAttribute(requestServiceNumber);
-					request_connected = request_connected == null ? 0 : request_connected;
-					request_connected = request_connected < 0 ? 0 : request_connected;
+					int request_connected = CmppUtils.extractRequestConnectionTotal(request, requestServiceNumber);
 					int max_connects = resolveRequestMaxConnections(bind.enterpriseId);
 					if (max_connects == 0) {
 						resp.status = 6;
@@ -388,7 +386,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 		//大爷的， 就少这么一个clone...并发上去以后，发现回复好多重复SEQ。。。。
 		// 百思不得其解。。。。。两天时间查了整个代码才发现！！！
 		// 细节是魔鬼啊。童鞋们注意了。。。
-		SubmitResponse resp = (SubmitResponse) this.context_smgp_packet_maps.get(Commands.CMPP_SUBMIT_RESP).clone();
+		SubmitResponse resp = (SubmitResponse) this.context_cmpp_packet_maps.get(Commands.CMPP_SUBMIT_RESP).clone();
 		resp.protocolVersion = this.protocolVersion;
 		resp.sequenceId = submit.sequenceId;
 		
@@ -456,7 +454,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 			int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
 			List<Deliver> submitted_list = (List<Deliver>) CmppUtils.extractRequestSubmitteds(request);
 			String serviceNumber = CmppUtils.extractRequestServiceNumber(request);
-			request.getContext().removeAttribute(serviceNumber);
+			CmppUtils.stepDecrementRequestConnection(request, serviceNumber);
 			returnQueuedDelivers(serviceNumber, submitted_list.subList(submitted_result_count, submitted_count));
 			CmppUtils.cleanRequestSubmitteds(request);
 		}

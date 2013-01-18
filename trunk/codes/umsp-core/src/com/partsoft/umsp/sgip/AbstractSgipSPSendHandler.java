@@ -110,6 +110,8 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 					SgipUtils.cleanRequestSubmitteds(request);
 				}
 				super.handleTimeout(request, response);
+			} else if (testQueuedSubmits()) {
+				doPostSubmit(request, response);
 			}
 		} else {
 			super.handleTimeout(request, response);

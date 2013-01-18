@@ -29,22 +29,22 @@ public abstract class SmgpUtils {
 	/**
 	 * 流量控制最后计数
 	 */
-	public static final String ARG_FLOW_TOTAL = "cmp.flow.total";
+	public static final String ARG_FLOW_TOTAL = "smgp.flow.total";
 
 	/**
 	 * 流量控制最后记录时间
 	 */
-	public static final String ARG_FLOW_LASTTIME = "cmp.flow.lasttime";
+	public static final String ARG_FLOW_LASTTIME = "smgp.flow.lasttime";
 
 	/**
 	 * 服务号码
 	 */
-	public static final String ARG_SERVICE_NUMBER = "cmpp.service.number";
+	public static final String ARG_SERVICE_NUMBER = "smgp.service.number";
 
 	/**
 	 * 服务签名
 	 */
-	public static final String ARG_SERVICE_SIGN = "cmpp.service.sign";
+	public static final String ARG_SERVICE_SIGN = "smgp.service.sign";
 
 	/**
 	 * 输出流参数
