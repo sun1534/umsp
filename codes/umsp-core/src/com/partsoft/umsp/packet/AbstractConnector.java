@@ -41,10 +41,10 @@ public abstract class AbstractConnector extends AbstractBuffers implements Conne
 	private boolean _reuseAddress = true;
 
 	// 最大socket数据读取等待时间(毫秒)，默认3秒
-	protected int _maxIdleTime = 30000;
+	protected int _maxIdleTime = 1500;
 	
 	// 处理资源低下时的数据读取等待时间(毫秒)，默认1.5秒
-	protected int _lowResourceMaxIdleTime = 20000;
+	protected int _lowResourceMaxIdleTime = 800;
 	
 	// 关闭时等待多长时间发送数据完成返回(毫秒)，默认3秒
 	protected int _soLingerTime = 3000;
@@ -422,7 +422,7 @@ public abstract class AbstractConnector extends AbstractBuffers implements Conne
 	public void setStatsOn(boolean on) {
 		if (on && _statsStartedAt != -1)
 			return;
-		Log.debug("Statistics on = " + on + " for " + this);
+		if (Log.isDebugEnabled()) Log.debug("Statistics on = " + on + " for " + this);
 		statsReset();
 		_statsStartedAt = on ? System.currentTimeMillis() : -1;
 	}

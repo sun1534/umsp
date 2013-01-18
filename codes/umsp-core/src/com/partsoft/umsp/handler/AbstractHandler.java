@@ -14,11 +14,11 @@ public abstract class AbstractHandler extends AbstractLifeCycle implements Handl
 	}
 
 	protected void doStart() throws Exception {
-		Log.debug(String.format("starting %s", getClass().getName()));
+		if (Log.isDebugEnabled()) Log.debug(String.format("starting %s", getClass().getName()));
 	}
 
 	protected void doStop() throws Exception {
-		Log.debug(String.format("stopping %s", getClass().getName()));
+		if (Log.isDebugEnabled()) Log.debug(String.format("stopping %s", getClass().getName()));
 	}
 
 	public String toString() {
