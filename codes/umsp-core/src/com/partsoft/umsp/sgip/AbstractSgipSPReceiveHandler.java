@@ -12,18 +12,34 @@ import com.partsoft.utils.StringUtils;
 
 public abstract class AbstractSgipSPReceiveHandler extends AbstractSgipContextSPHandler {
 	
+	protected int maxRequestIdleTime = 1000 * 60;
+	
 	public AbstractSgipSPReceiveHandler() {
 		
+	}
+	
+	
+	@Override
+	protected void handleTimeout(Request request, Response response) throws IOException {
+		long request_idle_time = System.currentTimeMillis() - request.getRequestTimestamp();
+		if (SgipUtils.testRequestBinded(request) || SgipUtils.testRequestBinding(request)) {
+			if (request_idle_time >= maxRequestIdleTime) {
+				super.handleTimeout(request, response);
+			}
+		} else {
+			super.handleTimeout(request, response);
+		}
 	}
 	
 	@Override
 	protected void doBindRequest(Request request, Response response)
 			throws IOException {
-		// 用于接收处理器（作为服务方）， 不需要绑定请求。
+		SgipUtils.setupRequestBinding(request, true);
 	}
 	
 	@Override
 	protected void doBind(Request request, Response response) throws IOException {
+		SgipUtils.setupRequestBinding(request, false);
 		Bind bind = (Bind) SgipUtils.extractRequestPacket(request);
 		BindResponse bind_resp = new BindResponse();
 		SgipUtils.copySerialNumber(bind_resp, bind);

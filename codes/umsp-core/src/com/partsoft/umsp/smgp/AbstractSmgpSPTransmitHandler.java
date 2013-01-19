@@ -137,15 +137,18 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 
 	@Override
 	protected void handleTimeout(Request request, Response response) throws IOException {
+		long request_idle_time = System.currentTimeMillis() - request.getRequestTimestamp();
+		boolean request_submitting = SmgpUtils.testRequestSubmiting(request);
 		if (SmgpUtils.testRequestBinded(request)
 				&& SmgpUtils.extractRequestActiveTestCount(request) < getMaxActiveTestCount()) {
-			long request_idle_time = System.currentTimeMillis() - request.getRequestTimestamp();
 			boolean is_active_testing = SmgpUtils.testRequestActiveTesting(request);
-			if (is_active_testing || request_idle_time > _activeTestIntervalTime) {
-				if (SmgpUtils.testRequestSubmiting(request)) {
+			if (is_active_testing || request_idle_time >= _activeTestIntervalTime) {
+				if (request_submitting) {
 					// 如果有submit再队列中，则回退。
 					int submitted_result_count = SmgpUtils.extractRequestSubmittedRepliedCount(request);
 					int submitted_count = SmgpUtils.extractRequestSubmittedCount(request);
+					Log.warn("For a long time did not receive a reply, return submit to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
+					
 					List<Submit> submitted_list = SmgpUtils.extractRequestSubmitteds(request);
 					List<Submit> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
 					returnQueuedSubmits(unresult_list);
@@ -160,9 +163,12 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 					}
 				}
 				doActiveTestRequest(request, response);
-				SmgpUtils.stepIncreaseRequestActiveTest(request);
-			} else if (testQueuedSubmits()) {
+			} else if (!request_submitting && testQueuedSubmits()) {
 				doPostSubmit(request, response);
+			}
+		} else if (SmgpUtils.testRequestBinding(request)) {
+			if (request_idle_time >= this._activeTestIntervalTime) {
+				super.handleTimeout(request, response);
 			}
 		} else {
 			super.handleTimeout(request, response);
@@ -175,10 +181,11 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 
 	@Override
 	protected void handleDisConnect(Request request, Response response) {
-		if (SmgpUtils.testRequestBinded(request)) {
+		if (SmgpUtils.testRequestBinded(request) && SmgpUtils.testRequestSubmiting(request)) {
 			List<Submit> submitts = SmgpUtils.extractRequestSubmitteds(request);
 			int submittedCount = SgipUtils.extractRequestSubmittedCount(request);
 			int submittedResultCount = SgipUtils.extractRequestSubmittedRepliedCount(request);
+			Log.warn("return submitted to queue, submit-count=" + submittedCount + ", reply-count=" + submittedResultCount);
 			returnQueuedSubmits(submitts.subList(submittedResultCount, submittedCount));
 		}
 		super.handleDisConnect(request, response);
@@ -289,6 +296,7 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 
 	@Override
 	protected void doBindRequest(Request request, Response response) throws IOException {
+		SmgpUtils.setupRequestBinding(request, true);
 		Login login = new Login();
 		login.TimeStamp = CalendarUtils.getTimestampInYearDuring(System.currentTimeMillis());
 		login.ClientID = account;
@@ -333,6 +341,7 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 				}
 			}
 		} else {
+			Log.warn("not found submitted, but receive submit reply???");
 			do_unbind = isAutoReSubmit() ? false : true;
 		}
 
@@ -352,6 +361,7 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 
 	@Override
 	protected void doBindResponse(Request request, Response response) throws IOException {
+		SmgpUtils.setupRequestBinding(request, false);
 		LoginResponse res = (LoginResponse) SmgpUtils.extractRequestPacket(request);
 		if (res.Status == StatusCodes.ERR_SUCCESS) {
 			SmgpUtils.setupRequestBinded(request, true);
@@ -376,6 +386,8 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 		} else {
 			int submitted_result_count = SmgpUtils.extractRequestSubmittedRepliedCount(request);
 			int submitted_count = SmgpUtils.extractRequestSubmittedCount(request);
+			Log.warn("Submit not reply but active test receive, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
+			
 			List<Submit> submitted_list = SmgpUtils.extractRequestSubmitteds(request);
 			returnQueuedSubmits(submitted_list.subList(submitted_result_count, submitted_count));
 			SmgpUtils.cleanRequestSubmitteds(request);
@@ -388,11 +400,6 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 		if (testQueuedSubmits()) {
 			doPostSubmit(request, response);
 		}
-	}
-
-	@Override
-	protected void doActiveTestRequest(Request request, Response response) throws IOException {
-		super.doActiveTestRequest(request, response);
 	}
 
 	@Override

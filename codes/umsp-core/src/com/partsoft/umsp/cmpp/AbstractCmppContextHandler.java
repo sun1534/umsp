@@ -84,6 +84,7 @@ public abstract class AbstractCmppContextHandler extends AbstractContextHandler 
 	}
 
 	protected void doActiveTestRequest(Request request, Response response) throws IOException {
+		CmppUtils.stepIncreaseRequestActiveTest(request);
 		ActiveTest test = ((ActiveTest) this.context_cmpp_packet_maps.get(Commands.CMPP_ACTIVE_TEST)).clone();
 		test.sequenceId = CmppUtils.generateRequestSequence(request);
 		CmppUtils.renderDataPacket(request, response, test);
@@ -93,8 +94,8 @@ public abstract class AbstractCmppContextHandler extends AbstractContextHandler 
 	protected void doActiveTestResponse(Request request, Response response) throws IOException {
 		Assert.isTrue(CmppUtils.testRequestBinded(request));
 		ActiveTestResponse test_response = (ActiveTestResponse) CmppUtils.extractRequestPacket(request);
-		if (Log.isDebugEnabled()) 
-		Log.debug(test_response.toString());
+		if (Log.isDebugEnabled())
+			Log.debug(test_response.toString());
 	}
 
 	protected void doBindResponse(Request request, Response response) throws IOException {
@@ -140,12 +141,14 @@ public abstract class AbstractCmppContextHandler extends AbstractContextHandler 
 
 	@Override
 	protected void handleConnect(Request request, Response response) throws IOException {
+		super.handleConnect(request, response);
 		doRequestStart(request, response);
 	}
 
 	@Override
 	protected void handleDisConnect(Request request, Response response) {
 		CmppUtils.cleanRequestAttributes(request);
+		super.handleDisConnect(request, response);
 	}
 
 	@Override

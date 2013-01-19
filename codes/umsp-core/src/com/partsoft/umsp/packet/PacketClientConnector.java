@@ -120,10 +120,10 @@ public class PacketClientConnector extends AbstractConnector {
 		}
 	}
 
-	protected PacketConnection newPacketConnection(EndPoint endpoint) {
-		return new PacketConnection(this.getOrigin(), this, this, endpoint, new PacketGenerator(this, endpoint,
-				getResponseBufferSize()));
-	}
+//	protected PacketConnection newPacketConnection(EndPoint endpoint) {
+//		return new PacketConnection(this.getOrigin(), this, this, endpoint, new PacketGenerator(this, endpoint,
+//				getResponseBufferSize()));
+//	}
 
 	protected Buffer newBuffer(int size) {
 		return new ByteArrayBuffer(size);
@@ -164,6 +164,7 @@ public class PacketClientConnector extends AbstractConnector {
 
 	@Override
 	protected void connectionException(PacketConnection connection, Throwable e) {
+		super.connectionException(connection, e);
 		if (!isAutoReConnect()) {
 			getOrigin().pushDelayException(e);
 		}

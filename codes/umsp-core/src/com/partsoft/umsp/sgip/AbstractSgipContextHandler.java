@@ -132,12 +132,14 @@ public abstract class AbstractSgipContextHandler extends AbstractContextHandler
 	@Override
 	protected void handleConnect(Request request, Response response)
 			throws IOException {
+		super.handleConnect(request, response);
 		doRequestStart(request, response);
 	}
 	
 	@Override
 	protected void handleDisConnect(Request request, Response response) {
 		SgipUtils.cleanRequestAttributes(request);
+		super.handleDisConnect(request, response);
 	}
 
 	@Override

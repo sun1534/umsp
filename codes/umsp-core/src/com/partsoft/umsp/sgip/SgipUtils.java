@@ -62,6 +62,8 @@ public abstract class SgipUtils {
 	 * 用户是否绑定参数
 	 */
 	public static final String ARG_REQUEST_BINDED = "sgip.user.binded";
+	
+	public static final String ARG_REQUEST_BINDING = "sgip.user.binding";
 
 	/**
 	 * 序列号参数
@@ -522,5 +524,18 @@ public abstract class SgipUtils {
 	public static int extractRequestFlowTotal(Request request) {
 		Integer result = (Integer) request.getAttribute(ARG_FLOW_TOTAL);
 		return result == null ? 0 : result;
-	}	
+	}
+	
+	public static boolean testRequestBinding(Request request) {
+		Object value = request.getAttribute(ARG_REQUEST_BINDING);
+		return CompareUtils.nullSafeEquals(value, Boolean.TRUE);
+	}
+	
+	public static void setupRequestBinding(Request request, boolean binded) {
+		if (binded) {
+			request.setAttribute(ARG_REQUEST_BINDING, Boolean.TRUE);
+		} else {
+			request.removeAttribute(ARG_REQUEST_BINDING);
+		}
+	}		
 }
