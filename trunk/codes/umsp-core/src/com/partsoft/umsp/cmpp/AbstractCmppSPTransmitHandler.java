@@ -127,14 +127,15 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 	@SuppressWarnings("unchecked")
 	@Override
 	protected void handleTimeout(Request request, Response response) throws IOException {
-		if (CmppUtils.testRequestBinded(request)
-				&& CmppUtils.extractRequestActiveTestCount(request) < getMaxActiveTestCount()) {
-			long request_idle_time = System.currentTimeMillis() - request.getRequestTimestamp();
+		long request_idle_time = System.currentTimeMillis() - request.getRequestTimestamp();
+		boolean request_submiting = CmppUtils.testRequestSubmiting(request);
+		if (CmppUtils.testRequestBinded(request) && CmppUtils.extractRequestActiveTestCount(request) < getMaxActiveTestCount()) {
 			boolean is_active_testing = CmppUtils.testRequestActiveTesting(request);
-			if (is_active_testing || request_idle_time > _activeTestIntervalTime) {
-				if (CmppUtils.testRequestSubmiting(request)) {
+			if (is_active_testing || request_idle_time >= this._activeTestIntervalTime) {
+				if (request_submiting) {
 					int submitted_result_count = CmppUtils.extractRequestSubmittedRepliedCount(request);
 					int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
+					Log.warn("For a long time did not receive a reply, return submit to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
 					List<Submit> submitted_list = (List<Submit>) CmppUtils.extractRequestSubmitteds(request);
 					List<Submit> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
 					returnQueuedSubmits(unresult_list);
@@ -149,9 +150,12 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 					}
 				}
 				doActiveTestRequest(request, response);
-				CmppUtils.stepIncreaseRequestActiveTest(request);
-			} else if (testQueuedSubmits()) {
+			} else if (!request_submiting && testQueuedSubmits()) {
 				doPostSubmit(request, response);
+			}
+		} else if (CmppUtils.testRequestBinding(request)) {
+			if (request_idle_time >= this._activeTestIntervalTime) {
+				super.handleTimeout(request, response);
 			}
 		} else {
 			super.handleTimeout(request, response);
@@ -161,9 +165,10 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 	@SuppressWarnings("unchecked")
 	@Override
 	protected void handleDisConnect(Request request, Response response) {
-		if (CmppUtils.testRequestBinded(request)) {
+		if (CmppUtils.testRequestBinded(request) && CmppUtils.testRequestSubmiting(request)) {
 			int submitted_result_count = CmppUtils.extractRequestSubmittedRepliedCount(request);
 			int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
+			Log.warn("return submitted to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
 			List<Submit> submitted_list = (List<Submit>) CmppUtils.extractRequestSubmitteds(request);
 			returnQueuedSubmits(submitted_list.subList(submitted_result_count, submitted_count));
 			CmppUtils.cleanRequestSubmitteds(request);
@@ -284,6 +289,7 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 
 	@Override
 	protected void doBindRequest(Request request, Response response) throws IOException {
+		CmppUtils.setupRequestBinding(request, true);
 		Connect login = new Connect();
 		login.timestamp = CalendarUtils.getTimestampInYearDuring(System.currentTimeMillis());
 		login.enterpriseId = this.account;
@@ -307,6 +313,9 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 			CmppUtils.updateSubmittedRepliedCount(request, last_pare_submit_index + 1);
 			Submit submitted = posts.get(last_pare_submit_index);
 			int transmit_listener_size = ListUtils.size(transmitListener);
+			
+			//TODO 需要去除
+			//Log.info("submit replied|" + CmppUtils.extractRequestSubmittedRepliedCount(request) + ", " + CmppUtils.extractRequestSubmittedCount(request));
 			if (transmit_listener_size > 0) {
 				TransmitEvent event = new TransmitEvent(new Object[] { submitted, res });
 				for (int j = 0; j < ListUtils.size(transmitListener); j++) {
@@ -321,8 +330,10 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 			
 			if (CmppUtils.extractRequestSubmittedRepliedCount(request) >= CmppUtils
 					.extractRequestSubmittedCount(request)) {
+				//Log.info("batch submitted success |" + CmppUtils.extractRequestSubmittedRepliedCount(request) + ", " + CmppUtils.extractRequestSubmittedCount(request));
 				returnQueuedSubmits(null);
 				CmppUtils.cleanRequestSubmitteds(request);
+				do_unbind = isAutoReSubmit() ? false : true;
 				if (testQueuedSubmits()) {
 					this.doPostSubmit(request, response);
 				} else {
@@ -330,6 +341,7 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 				}
 			}
 		} else {
+			Log.warn("not found submitted, but receive submit reply???");
 			do_unbind = isAutoReSubmit() ? false : true;
 		}
 
@@ -349,6 +361,7 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 
 	@Override
 	protected void doBindResponse(Request request, Response response) throws IOException {
+		CmppUtils.setupRequestBinding(request, false);
 		ConnectResponse res = (ConnectResponse) CmppUtils.extractRequestPacket(request);
 		if (res.status == 0) {
 			CmppUtils.setupRequestBinded(request, true);
@@ -374,6 +387,8 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 		} else {
 			int submitted_result_count = CmppUtils.extractRequestSubmittedRepliedCount(request);
 			int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
+			Log.warn("Submit not reply but active test receive, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
+			
 			List<Submit> submitted_list = (List<Submit>) CmppUtils.extractRequestSubmitteds(request);
 			returnQueuedSubmits(submitted_list.subList(submitted_result_count, submitted_count));
 			CmppUtils.cleanRequestSubmitteds(request);

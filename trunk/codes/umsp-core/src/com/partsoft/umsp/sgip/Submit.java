@@ -219,6 +219,8 @@ public class Submit extends SgipDataPacket {
 
 	public void setUserNumbers(String value) {
 		if (StringUtils.hasText(value)) {
+			this.user_count = 0;
+			this.user_number = null;
 			if (value.indexOf(',') >= 0) {
 				for (String number : value.split(",")) {
 					if (StringUtils.hasText(number.trim())) {

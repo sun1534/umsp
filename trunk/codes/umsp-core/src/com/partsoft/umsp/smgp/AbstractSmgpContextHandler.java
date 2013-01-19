@@ -77,6 +77,7 @@ public abstract class AbstractSmgpContextHandler extends AbstractContextHandler 
 	}
 
 	protected void doActiveTestRequest(Request request, Response response) throws IOException {
+		SmgpUtils.stepIncreaseRequestActiveTest(request);
 		ActiveTest test = ((ActiveTest) this.context_smgp_packet_maps.get(RequestIDs.active_test)).clone();
 		test.sequenceId = SmgpUtils.generateRequestSequence(request);
 		SmgpUtils.renderDataPacket(request, response, test);
@@ -127,12 +128,14 @@ public abstract class AbstractSmgpContextHandler extends AbstractContextHandler 
 
 	@Override
 	protected void handleConnect(Request request, Response response) throws IOException {
+		super.handleConnect(request, response);
 		doRequestStart(request, response);
 	}
 	
 	@Override
 	protected void handleDisConnect(Request request, Response response) {
 		SmgpUtils.cleanRequestAttributes(request);
+		super.handleDisConnect(request, response);
 	}
 
 	@Override

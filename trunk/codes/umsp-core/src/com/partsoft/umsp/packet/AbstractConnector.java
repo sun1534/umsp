@@ -35,17 +35,17 @@ public abstract class AbstractConnector extends AbstractBuffers implements Conne
 
 	// accept线程优先级偏移量
 	private int _acceptorPriorityOffset = 0;
-	
+
 	private boolean _useDNS;
-	
+
 	private boolean _reuseAddress = true;
 
 	// 最大socket数据读取等待时间(毫秒)，默认3秒
 	protected int _maxIdleTime = 1500;
-	
+
 	// 处理资源低下时的数据读取等待时间(毫秒)，默认1.5秒
 	protected int _lowResourceMaxIdleTime = 800;
-	
+
 	// 关闭时等待多长时间发送数据完成返回(毫秒)，默认3秒
 	protected int _soLingerTime = 3000;
 
@@ -422,7 +422,8 @@ public abstract class AbstractConnector extends AbstractBuffers implements Conne
 	public void setStatsOn(boolean on) {
 		if (on && _statsStartedAt != -1)
 			return;
-		if (Log.isDebugEnabled()) Log.debug("Statistics on = " + on + " for " + this);
+		if (Log.isDebugEnabled())
+			Log.debug("Statistics on = " + on + " for " + this);
 		statsReset();
 		_statsStartedAt = on ? System.currentTimeMillis() : -1;
 	}
@@ -442,6 +443,10 @@ public abstract class AbstractConnector extends AbstractBuffers implements Conne
 	}
 
 	protected void connectionOpened(PacketConnection connection) {
+		Log.info("TCP connected, remote(" + connection.getRequest().getRemoteAddr() + ":"
+				+ connection.getRequest().getRemotePort() + ")" + ", local(" + connection.getRequest().getLocalAddr()
+				+ ":" + connection.getRequest().getLocalPort() + ")");
+
 		if (_statsStartedAt == -1)
 			return;
 		synchronized (_statsLock) {
@@ -452,10 +457,14 @@ public abstract class AbstractConnector extends AbstractBuffers implements Conne
 	}
 
 	protected void connectionException(PacketConnection connection, Throwable e) {
-
+		Log.error(connection.toString() + " handler error: " + e.getMessage(), e);
 	}
 
 	protected void connectionClosed(PacketConnection connection) {
+		Log.info("TCP connect termiante, remote(" + connection.getRequest().getRemoteAddr() + ":"
+				+ connection.getRequest().getRemotePort() + ")" + ", local(" + connection.getRequest().getLocalAddr()
+				+ ":" + connection.getRequest().getLocalPort() + ")");
+		
 		if (_statsStartedAt >= 0) {
 			long duration = System.currentTimeMillis() - connection.getTimeStamp();
 			int requests = connection.getRequests();
@@ -544,7 +553,7 @@ public abstract class AbstractConnector extends AbstractBuffers implements Conne
 		public int getSoTimeout() {
 			return this._sotimeout;
 		}
-		
+
 		public void setSoTimeout(int timeout) {
 			this._sotimeout = timeout;
 		}

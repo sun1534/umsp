@@ -35,12 +35,13 @@ public class PacketRequest implements Request {
 
 	private String _originName;
 
-	private long _requestTimestamp = -1;
+	private long _requestTimestamp;
 
 	public PacketRequest(PacketConnection connection) {
 		this._connection = connection;
 		this._endp = connection._endp;
-		_dns = _connection.getResolveNames();
+		this._dns = _connection.getResolveNames();
+		this._requestTimestamp = System.currentTimeMillis();
 	}
 
 	protected void recycle() {

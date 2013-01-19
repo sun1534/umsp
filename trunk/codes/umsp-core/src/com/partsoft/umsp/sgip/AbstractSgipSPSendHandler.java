@@ -99,19 +99,25 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 
 	@Override
 	protected void handleTimeout(Request request, Response response) throws IOException {
+		long request_idle_time = System.currentTimeMillis() - request.getRequestTimestamp();
+		boolean request_submiting = SgipUtils.testRequestSubmiting(request);
 		if (SgipUtils.testRequestBinded(request)) {
-			long request_idle_time = System.currentTimeMillis() - request.getRequestTimestamp();
-			if (request_idle_time > maxRequestIdleTime) {
+			if (request_idle_time >= maxRequestIdleTime) {
 				if (SgipUtils.testRequestSubmiting(request)) {
 					List<Submit> submits = SgipUtils.extractRequestSubmitteds(request);
 					int submitted_result_count = SgipUtils.extractRequestSubmittedRepliedCount(request);
 					int submitted_count = SgipUtils.extractRequestSubmittedCount(request);
+					Log.warn("For a long time did not receive a reply, return submit to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
 					returnQueuedSubmits(submits.subList(submitted_result_count, submitted_count));
 					SgipUtils.cleanRequestSubmitteds(request);
 				}
 				super.handleTimeout(request, response);
-			} else if (testQueuedSubmits()) {
+			} else if (!request_submiting && testQueuedSubmits()) {
 				doPostSubmit(request, response);
+			}
+		} else if (SgipUtils.testRequestBinding(request)) {
+			if (request_idle_time >= this.maxRequestIdleTime) {
+				super.handleTimeout(request, response);
 			}
 		} else {
 			super.handleTimeout(request, response);
@@ -232,6 +238,7 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 				}
 			}
 		} else {
+			Log.warn("not found submitted, but receive submit reply???");
 			do_unbind = isAutoReSubmit() ? false : true;
 		}
 
@@ -250,6 +257,7 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 
 	@Override
 	protected void doBindResponse(Request request, Response response) throws IOException {
+		SgipUtils.setupRequestBinding(request, false);
 		BindResponse res = (BindResponse) SgipUtils.extractRequestPacket(request);
 		if (res.result == BindResults.SUCCESS) {
 			SgipUtils.setupRequestBinded(request, true);
@@ -269,6 +277,7 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 
 	@Override
 	protected void doBindRequest(Request request, Response response) throws IOException {
+		SgipUtils.setupRequestBinding(request, true);
 		Bind bind = new Bind();
 		bind.user = account;
 		bind.pwd = password;
@@ -299,10 +308,11 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 
 	@Override
 	protected void handleDisConnect(Request request, Response response) {
-		if (SgipUtils.testRequestBinded(request)) {
+		if (SgipUtils.testRequestBinded(request) && SgipUtils.testRequestSubmiting(request)) {
 			List<Submit> submitts = SgipUtils.extractRequestSubmitteds(request);
 			int submittedCount = SgipUtils.extractRequestSubmittedCount(request);
 			int submittedResultCount = SgipUtils.extractRequestSubmittedRepliedCount(request);
+			Log.warn("return submitted to queue, submit-count=" + submittedCount + ", reply-count=" + submittedResultCount);
 			returnQueuedSubmits(submitts.subList(submittedResultCount, submittedCount));
 		}
 		super.handleDisConnect(request, response);

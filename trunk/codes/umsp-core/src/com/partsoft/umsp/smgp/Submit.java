@@ -155,6 +155,8 @@ public class Submit extends SmgpTlvDataPacket {
 
 	public void setUserNumbers(String value) {
 		if (StringUtils.hasText(value)) {
+			this.DestTermIDCount = 0;
+			this.DestTermID = null;
 			if (value.indexOf(',') >= 0) {
 				for (String number : value.split(",")) {
 					addUserNumber(number.trim());

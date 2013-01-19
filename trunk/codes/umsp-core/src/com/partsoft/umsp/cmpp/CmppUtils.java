@@ -75,6 +75,8 @@ public abstract class CmppUtils {
 	 * 用户是否绑定参数
 	 */
 	public static final String ARG_REQUEST_BINDED = "cmpp.user.binded";
+	
+	public static final String ARG_REQUEST_BINDING = "cmpp.user.binding";
 
 	/**
 	 * 上下文序列号参数
@@ -384,7 +386,7 @@ public abstract class CmppUtils {
 		Object value = request.getAttribute(ARG_REQUEST_BINDED);
 		return CompareUtils.nullSafeEquals(value, Boolean.TRUE);
 	}
-
+	
 	/**
 	 * 配置请求是否绑定
 	 * 
@@ -711,6 +713,19 @@ public abstract class CmppUtils {
 			}
 		}
 	}
+
+
+	public static boolean testRequestBinding(Request request) {
+		Object value = request.getAttribute(ARG_REQUEST_BINDING);
+		return CompareUtils.nullSafeEquals(value, Boolean.TRUE);
+	}
 	
+	public static void setupRequestBinding(Request request, boolean binded) {
+		if (binded) {
+			request.setAttribute(ARG_REQUEST_BINDING, Boolean.TRUE);
+		} else {
+			request.removeAttribute(ARG_REQUEST_BINDING);
+		}
+	}	
 
 }
