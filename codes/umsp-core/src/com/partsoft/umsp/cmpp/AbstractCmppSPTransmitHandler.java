@@ -142,10 +142,12 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 					CmppUtils.cleanRequestSubmitteds(request);
 					int transmit_listener_size = ListUtils.size(transmitListener);
 					if (transmit_listener_size > 0 && unresult_list.size() > 0) {
-						TransmitEvent event = new TransmitEvent(unresult_list);
-						for (int i = 0; i < transmit_listener_size; i++) {
-							TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
-							listener.transmitTimeout(event);
+						for (int ii = 0; ii < unresult_list.size(); ii++) {
+							TransmitEvent event = new TransmitEvent(unresult_list.get(ii));
+							for (int i = 0; i < transmit_listener_size; i++) {
+								TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
+								listener.transmitTimeout(event);
+							}
 						}
 					}
 				}
