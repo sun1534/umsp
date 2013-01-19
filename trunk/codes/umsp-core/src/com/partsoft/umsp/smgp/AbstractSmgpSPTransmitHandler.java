@@ -148,17 +148,18 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 					int submitted_result_count = SmgpUtils.extractRequestSubmittedRepliedCount(request);
 					int submitted_count = SmgpUtils.extractRequestSubmittedCount(request);
 					Log.warn("For a long time did not receive a reply, return submit to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
-					
 					List<Submit> submitted_list = SmgpUtils.extractRequestSubmitteds(request);
 					List<Submit> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
 					returnQueuedSubmits(unresult_list);
 					SmgpUtils.cleanRequestSubmitteds(request);
 					int transmit_listener_size = ListUtils.size(transmitListener);
 					if (transmit_listener_size > 0 && unresult_list.size() > 0) {
-						TransmitEvent event = new TransmitEvent(unresult_list);
-						for (int i = 0; i < transmit_listener_size; i++) {
-							TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
-							listener.transmitTimeout(event);
+						for (int ii = 0; ii < unresult_list.size(); ii++) {
+							TransmitEvent event = new TransmitEvent(unresult_list.get(ii));
+							for (int i = 0; i < transmit_listener_size; i++) {
+								TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
+								listener.transmitTimeout(event);
+							}
 						}
 					}
 				}
