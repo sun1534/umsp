@@ -84,6 +84,8 @@ public abstract class AbstractCmppContextHandler extends AbstractContextHandler 
 	}
 
 	protected void doActiveTestRequest(Request request, Response response) throws IOException {
+		//TODO 临时日志
+		//Log.warn("超时发送链路侦测包...");
 		CmppUtils.stepIncreaseRequestActiveTest(request);
 		ActiveTest test = ((ActiveTest) this.context_cmpp_packet_maps.get(Commands.CMPP_ACTIVE_TEST)).clone();
 		test.sequenceId = CmppUtils.generateRequestSequence(request);
