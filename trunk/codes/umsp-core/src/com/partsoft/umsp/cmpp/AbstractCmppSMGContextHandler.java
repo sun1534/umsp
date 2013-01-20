@@ -14,6 +14,7 @@ import com.partsoft.umsp.handler.TransmitEvent;
 import com.partsoft.umsp.handler.TransmitListener;
 import com.partsoft.umsp.io.ByteArrayBuffer;
 import com.partsoft.umsp.log.Log;
+import com.partsoft.umsp.packet.PacketException;
 import com.partsoft.umsp.utils.UmspUtils;
 import com.partsoft.utils.CalendarUtils;
 import com.partsoft.utils.ListUtils;
@@ -37,6 +38,11 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 	 * @brief 一次最多发送16条
 	 */
 	protected int _maxOnceDelivers = 16;
+	
+	/**
+	 * 发生错误时是否返回队列
+	 */
+	protected boolean errorReturnQueue = false;
 
 	protected Object transmitListener;
 
@@ -191,53 +197,69 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 	 * @return
 	 */
 	protected abstract boolean testQueuedDelivers(String serviceNumber);
+	
+	public void setErrorReturnQueue(boolean errorReturnQueue) {
+		this.errorReturnQueue = errorReturnQueue;
+	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	protected void handleTimeout(Request request, Response response) throws IOException {
 		long request_idle_time = System.currentTimeMillis() - request.getRequestTimestamp();
 		boolean request_submiting = CmppUtils.testRequestSubmiting(request);
-		if (CmppUtils.testRequestBinded(request) && CmppUtils.extractRequestActiveTestCount(request) < getMaxActiveTestCount()) {
-			boolean is_active_testing = CmppUtils.testRequestActiveTesting(request);
-			String serviceNumber = CmppUtils.extractRequestServiceNumber(request);
-			if (is_active_testing || request_idle_time >= _activeTestIntervalTime) {
-				if (request_submiting) {
-					int submitted_result_count = CmppUtils.extractRequestSubmittedRepliedCount(request);
-					int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
-					Log.warn("For a long time did not receive a reply, return submit to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
-					
-					List<Deliver> submitted_list = (List<Deliver>) CmppUtils.extractRequestSubmitteds(request);
-					List<Deliver> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
-					this.returnQueuedDelivers(serviceNumber, unresult_list);
-					CmppUtils.cleanRequestSubmitteds(request);
-					int transmit_listener_size = ListUtils.size(transmitListener);
-					if (transmit_listener_size > 0 && unresult_list.size() > 0) {
-						for (int ii = 0; ii < unresult_list.size(); ii++) {
-							TransmitEvent event = new TransmitEvent(unresult_list.get(ii));
-							for (int i = 0; i < transmit_listener_size; i++) {
-								TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
-								listener.transmitTimeout(event);
-							}
-						}
-					}
-				}
+		int request_activetest_count = CmppUtils.extractRequestActiveTestCount(request);
+		String serviceNumber = CmppUtils.extractRequestServiceNumber(request);
+		boolean throw_packet_timeout = false;
+		
+		if (CmppUtils.testRequestBinded(request) && request_activetest_count < getMaxActiveTestCount()) {
+			if (request_idle_time >= (this._activeTestIntervalTime * (request_activetest_count + 1))) {
 				doActiveTestRequest(request, response);
-			} else if (!request_submiting && testQueuedDelivers(serviceNumber)) {
+			} else if (request_activetest_count <= 0 && !request_submiting && testQueuedDelivers(serviceNumber)) {
 				doPostDeliver(request, response);
 			}
 		} else if (CmppUtils.testRequestBinding(request)) {
-			if (request_idle_time >= this._activeTestIntervalTime) {
-				super.handleTimeout(request, response);
-			}
+			throw_packet_timeout = request_idle_time >= this._activeTestIntervalTime;
 		} else {
-			super.handleTimeout(request, response);
+			throw_packet_timeout = true;
 		}
+		
+		if(throw_packet_timeout) {
+			if (request_submiting) {
+				int submitted_result_count = CmppUtils.extractRequestSubmittedRepliedCount(request);
+				int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
+				Log.warn("For a long time not receive reply, return submit to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
+				
+				List<Deliver> submitted_list = (List<Deliver>) CmppUtils.extractRequestSubmitteds(request);
+				List<Deliver> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
+				if (this.errorReturnQueue) {
+					this.returnQueuedDelivers(serviceNumber, unresult_list);
+				}
+				CmppUtils.cleanRequestSubmitteds(request);
+				int transmit_listener_size = ListUtils.size(transmitListener);
+				if (transmit_listener_size > 0 && unresult_list.size() > 0) {
+					for (int ii = 0; ii < unresult_list.size(); ii++) {
+						TransmitEvent event = new TransmitEvent(unresult_list.get(ii));
+						for (int i = 0; i < transmit_listener_size; i++) {
+							TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
+							listener.transmitTimeout(event);
+						}
+					}
+				}
+			}
+			throw new PacketException(String.format(request_activetest_count + " times active test, but not reply"));
+		}
+		
 	}
 	
 	protected void doPostDeliver(Request request, Response response) throws IOException {
 		Integer submitted = Integer.valueOf(0);
 		String serviceNumber = CmppUtils.extractRequestServiceNumber(request);
-		List<Deliver> takedPostSubmits = takeQueuedDelivers(serviceNumber);
+		List<Deliver> takedPostSubmits = null;
+		try {
+			takedPostSubmits = takeQueuedDelivers(serviceNumber);
+		} catch (Throwable e) {
+			Log.error("take delivers from queue error: " + e.getMessage(), e);
+		}
 		if (takedPostSubmits != null) {
 			for (Deliver sb : takedPostSubmits) {
 				sb.protocolVersion = this.protocolVersion;
@@ -265,9 +287,11 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 					response.flushBuffer();
 					CmppUtils.updateSubmitteds(request, takedPostSubmits, submitted + 1);
 				} catch (IOException e) {
-					// 为可靠起见，把所有提取的submit都回退至队列中
-					// TODO 考虑设置一个参数，可以把已经提交的不回退
-					returnQueuedDelivers(serviceNumber, takedPostSubmits);
+					if (this.errorReturnQueue) {
+						returnQueuedDelivers(serviceNumber, takedPostSubmits);
+					} else {
+						returnQueuedDelivers(serviceNumber, takedPostSubmits.subList(submitted, takedPostSubmits.size()));
+					}
 					CmppUtils.cleanRequestSubmitteds(request);
 					throw e;
 				}
@@ -287,17 +311,28 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 			}
 		}
 	}
+	
+	@Override
+	protected void doActiveTestResponse(Request request, Response response) throws IOException {
+		super.doActiveTestResponse(request, response);
+		//TODO 临时日志
+		//Log.warn("发送至客户端的链路侦测包已应答");
+		String serviceNumber = CmppUtils.extractRequestServiceNumber(request);
+		if (!CmppUtils.testRequestSubmiting(request) && testQueuedDelivers(serviceNumber)) {
+			doPostDeliver(request, response);
+		}
+	}
 
-	@SuppressWarnings("unchecked")
+	//@SuppressWarnings("unchecked")
 	@Override
 	protected void doActiveTest(Request request, Response response) throws IOException {
 		super.doActiveTest(request, response);
+		//TODO 临时日志
+		//Log.warn("收到来自客户端的链路侦测包");
+		
 		String serviceNumber = CmppUtils.extractRequestServiceNumber(request);
-		if (!CmppUtils.testRequestSubmiting(request)) {
-			if (testQueuedDelivers(serviceNumber)) {
-				doPostDeliver(request, response);
-			}
-		} else {
+		/**
+		if (CmppUtils.testRequestSubmiting(request)) {
 			int submitted_result_count = CmppUtils.extractRequestSubmittedRepliedCount(request);
 			int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
 			Log.warn("Submit not reply but active test receive, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
@@ -305,6 +340,13 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 			List<Deliver> submitted_list = (List<Deliver>) CmppUtils.extractRequestSubmitteds(request);
 			returnQueuedDelivers(serviceNumber, submitted_list.subList(submitted_result_count, submitted_count));
 			CmppUtils.cleanRequestSubmitteds(request);
+		} else if (testQueuedDelivers(serviceNumber)) {
+			doPostDeliver(request, response);
+		}
+		*/
+		
+		if (!CmppUtils.testRequestSubmiting(request) && testQueuedDelivers(serviceNumber)) {
+			doPostDeliver(request, response);
 		}
 	}
 
@@ -328,7 +370,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 					try {
 						evnListener.endTransmit(event);
 					} catch (Throwable e) {
-						Log.ignore(e);
+						Log.error("ignored deliver end transmit error: " + e.getMessage(), e);
 					}
 				}
 			}
@@ -462,7 +504,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 	@SuppressWarnings("unchecked")
 	@Override
 	protected void handleDisConnect(Request request, Response response) {
-		if (CmppUtils.testRequestBinded(request) && CmppUtils.testRequestSubmiting(request)) {
+		if (CmppUtils.testRequestBinded(request) && CmppUtils.testRequestSubmiting(request) && this.errorReturnQueue) {
 			int submitted_result_count = CmppUtils.extractRequestSubmittedRepliedCount(request);
 			int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
 			Log.warn("return submitted to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
