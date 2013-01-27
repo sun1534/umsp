@@ -9,6 +9,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import com.partsoft.umsp.Client;
+import com.partsoft.umsp.Context;
 import com.partsoft.umsp.Request;
 import com.partsoft.umsp.Constants.SMS;
 import com.partsoft.umsp.Response;
@@ -69,6 +70,8 @@ public abstract class SgipUtils {
 	 * 序列号参数
 	 */
 	public static final String ARG_REQUEST_SEQUENCE = "sgip.request.sequence";
+	
+	public static final String ARG_CONTEXT_SEQUENCE = "sgip.context.sequence";
 
 	/**
 	 * 已提交服务器的消息列表
@@ -321,6 +324,24 @@ public abstract class SgipUtils {
 			request.removeAttribute(ARG_REQUEST_BINDED);
 		}
 	}
+	
+	public static int generateContextSequence(Context ctx) {
+		int result = 1;
+		synchronized (ctx) {
+			Integer seq = (Integer) ctx.getAttribute(ARG_CONTEXT_SEQUENCE);
+			if (seq == null) {
+				seq = 0;
+			}
+			seq = seq + 1;
+			if (seq >= Integer.MAX_VALUE) {
+				seq = 1;
+			}
+			result = seq;
+			ctx.setAttribute(ARG_CONTEXT_SEQUENCE, seq);
+		}
+		return result;
+	}
+
 
 	/**
 	 * 产生SEQ

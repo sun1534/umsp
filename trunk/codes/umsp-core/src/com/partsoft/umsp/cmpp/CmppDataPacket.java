@@ -10,8 +10,9 @@ import com.partsoft.umsp.log.Log;
 import com.partsoft.umsp.packet.AbstractDataPacket;
 import com.partsoft.utils.Assert;
 
-@SuppressWarnings("serial")
 public abstract class CmppDataPacket extends AbstractDataPacket implements DataPacket, Cloneable {
+
+	private static final long serialVersionUID = 8281863141661642879L;
 
 	protected static final int PACKET_HEADER_SIZE = 8;
 

@@ -14,9 +14,9 @@ public final class Client extends AbstractOriginHandler implements Attributes, O
 	protected boolean _autoReConnect = false;
 
 	/**
-	 * @brief 重连间隔时间，单位：毫秒，默认值（3秒）
+	 * @brief 重连间隔时间，单位：毫秒，默认值（30秒）
 	 */
-	protected long _reConnectIntervalTime = 3000;
+	protected long _reConnectIntervalTime = 30000;
 
 	/**
 	 * 连接超时时间，单位：毫秒，默认值1秒

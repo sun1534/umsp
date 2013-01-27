@@ -29,16 +29,32 @@ import com.partsoft.utils.CompareUtils;
 import com.partsoft.utils.RandomUtils;
 
 public abstract class CmppUtils {
+	
+	public static final String ARG_SUBMIT_PERSECOND_MAX = "cmpp.submit.persecond.max";
+	
+	public static final String ARG_DELIVER_PERSECOND_MAX = "cmpp.deliver.persecond.max"; 
 
 	/**
-	 * 流量控制最后计数
+	 * 发送流量控制最后计数
 	 */
 	public static final String ARG_FLOW_TOTAL = "cmpp.flow.total";
 
 	/**
-	 * 流量控制最后记录时间
+	 * 发送流量控制最后记录时间
 	 */
 	public static final String ARG_FLOW_LASTTIME = "cmpp.flow.lasttime";
+	
+
+	/**
+	 * 接收流量控制最后计数
+	 */
+	public static final String ARG_RECV_FLOW_TOTAL = "cmpp.flow.total.recv";
+
+	/**
+	 * 接收流量控制最后记录时间
+	 */
+	public static final String ARG_RECV_FLOW_LASTTIME = "cmpp.flow.lasttime.recv";
+		
 	
 	
 	/**
@@ -626,6 +642,33 @@ public abstract class CmppUtils {
 			request.removeAttribute(name);
 		}
 	}
+	
+	public static void setupRequestMaxSubmitPerSecond(Request request, int max) {
+		if (max > 0) {
+			request.setAttribute(ARG_SUBMIT_PERSECOND_MAX, max);
+		} else {
+			request.removeAttribute(ARG_SUBMIT_PERSECOND_MAX);
+		}
+	}
+	
+	public static int extractRequestMaxSubmitPerSecond(Request request) {
+		Integer result = (Integer) request.getAttribute(ARG_SUBMIT_PERSECOND_MAX);
+		return result == null ? 0 : result.intValue();
+	}
+	
+	
+	public static void setupRequestMaxDeliverPerSecond(Request request, int max) {
+		if (max > 0) {
+			request.setAttribute(ARG_DELIVER_PERSECOND_MAX, max);
+		} else {
+			request.removeAttribute(ARG_DELIVER_PERSECOND_MAX);
+		}
+	}
+	
+	public static int extractRequestMaxDeliverPerSecond(Request request) {
+		Integer result = (Integer) request.getAttribute(ARG_DELIVER_PERSECOND_MAX);
+		return result == null ? 0 : result.intValue();
+	}
 
 	public static void setupRequestServiceNumber(Request request, String serviceNumber) {
 		request.setAttribute(ARG_SERVICE_NUMBER, serviceNumber);
@@ -727,5 +770,20 @@ public abstract class CmppUtils {
 			request.removeAttribute(ARG_REQUEST_BINDING);
 		}
 	}	
+	
+	public static void updateRequestReceiveFlowTotal(Request request, long flowLastTime, int count) {
+		request.setAttribute(ARG_RECV_FLOW_TOTAL, count);
+		request.setAttribute(ARG_RECV_FLOW_LASTTIME, flowLastTime);
+	}
+
+	public static long extractRequestReceiveFlowLastTime(Request request) {
+		Long result = (Long) request.getAttribute(ARG_RECV_FLOW_LASTTIME);
+		return result == null ? System.currentTimeMillis() : result;
+	}
+
+	public static int extractRequestReceiveFlowTotal(Request request) {
+		Integer result = (Integer) request.getAttribute(ARG_RECV_FLOW_TOTAL);
+		return result == null ? 0 : result;
+	}
 
 }
