@@ -50,5 +50,17 @@ public interface SpClientInfoGetter {
 	 * @return &lt;0表示不限制，=0表示不允许连接，>0表示最大限制连接数
 	 */
 	int getMaxConnections(String uid);
+	
+	/**
+	 * 最大允许每秒允许提交数
+	 * @return
+	 */
+	int getMaxSubmitPerSecond(String uid);
+	
+	/**
+	 * 最大每秒转递数
+	 * @return
+	 */
+	int getMaxDeliverPerSecond(String uid);
 
 }

@@ -37,12 +37,22 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 	/**
 	 * @brief 一次最多发送16条
 	 */
-	protected int _maxOnceDelivers = 16;
+	protected int _maxOnceDelivers = 10;
+	
+	/**
+	 * 最大每秒提交数(默认50条)
+	 */
+	protected int maxSubmitPerSecond = 50;
+	
+	/**
+	 * 客户转发最大每秒100条（默认）
+	 */
+	protected int maxDeliverPerSecond = 100;	
 	
 	/**
 	 * 发生错误时是否返回队列
 	 */
-	protected boolean errorReturnQueue = false;
+	protected boolean errorReturnQueue = true;
 
 	protected Object transmitListener;
 
@@ -72,7 +82,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 			this.transmitListener = ListUtils.add(this.transmitListener, listener);
 		}
 	}
-
+	
 	public void setPhoneNumberValidator(PhoneNumberValidator phoneNumberValidator) {
 		this.phoneNumberValidator = phoneNumberValidator;
 	}
@@ -96,6 +106,10 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 	public void setMaxOnceDelivers(int maxOnceSubmits) {
 		this._maxOnceDelivers = maxOnceSubmits;
 	}
+	
+	public void setMaxSubmitPerSecond(int maxSubmitPerSecond) {
+		this.maxSubmitPerSecond = maxSubmitPerSecond;
+	}
 
 	public int getMaxOnceDelivers() {
 		return _maxOnceDelivers;
@@ -118,6 +132,11 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 	protected final void doBind(Request request, Response response) throws IOException {
 		super.doBind(request, response);
 		CmppUtils.setupRequestBinding(request, false);
+		String requestServiceNumber = null;
+		String requestServiceSign = null;
+		int requestMaxSubmitsPerSecond = this.maxSubmitPerSecond;
+		int requestMaxDeliversPerSecond = this.maxDeliverPerSecond;
+		
 		Connect bind = (Connect) CmppUtils.extractRequestPacket(request);
 		ConnectResponse resp = (ConnectResponse) context_cmpp_packet_maps.get(Commands.CMPP_CONNECT_RESP).clone();
 		resp.sequenceId = bind.sequenceId;
@@ -132,21 +151,26 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 				resp.status = 9;
 			}
 			if (resp.status == 0) {
-				String requestServiceNumber = resolveRequestServiceNumber(bind.enterpriseId);
-				String requestServiceSign = resolveRequestSignature(bind.enterpriseId);
-				CmppUtils.setupRequestServiceSignature(request, requestServiceSign);
+				requestServiceNumber = resolveRequestServiceNumber(bind.enterpriseId);
+				requestServiceSign = resolveRequestSignature(bind.enterpriseId);
+				requestMaxSubmitsPerSecond = resolveRequestMaxSubmitsPerSecond(bind.enterpriseId);
+				requestMaxDeliversPerSecond = resolveRequestMaxDeliversPerSecond(bind.enterpriseId);
+				
 				if (StringUtils.hasText(requestServiceNumber)) {
-					CmppUtils.setupRequestServiceNumber(request, requestServiceNumber);
-					int request_connected = CmppUtils.extractRequestConnectionTotal(request, requestServiceNumber);
-					int max_connects = resolveRequestMaxConnections(bind.enterpriseId);
-					if (max_connects == 0) {
-						resp.status = 6;
-					} else if (max_connects > 0) {
-						if (request_connected >= max_connects) {
+					synchronized (request.getContext()) {
+						int request_connected = CmppUtils.extractRequestConnectionTotal(request, requestServiceNumber);
+						int max_connects = resolveRequestMaxConnections(bind.enterpriseId);
+						if (max_connects == 0) {
 							resp.status = 6;
+						} else if (max_connects > 0) {
+							if (request_connected >= max_connects) {
+								resp.status = 6;
+							}
+						}
+						if (resp.status == 0) {
+							CmppUtils.stepIncreaseRequestConnection(request, requestServiceNumber);
 						}
 					}
-					request.getContext().setAttribute(requestServiceNumber, ++request_connected);
 				} else {
 					resp.status = 5;
 				}
@@ -158,6 +182,10 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 		CmppUtils.renderDataPacket(request, response, resp);
 		if (resp.status == 0) {
 			CmppUtils.setupRequestBinded(request, true);
+			CmppUtils.setupRequestServiceNumber(request, requestServiceNumber);
+			CmppUtils.setupRequestServiceSignature(request, requestServiceSign);
+			CmppUtils.setupRequestMaxSubmitPerSecond(request, requestMaxSubmitsPerSecond);
+			CmppUtils.setupRequestMaxDeliverPerSecond(request, requestMaxDeliversPerSecond);
 			response.flushBuffer();
 			afterSuccessClientConnected(request, response);
 		} else {
@@ -175,6 +203,10 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 	protected abstract int resolveRequestMaxConnections(String enterpriseId);
 
 	protected abstract String resolveRequestSignature(String enterpriseId);
+	
+	protected abstract int resolveRequestMaxSubmitsPerSecond(String enterpriseId);
+	
+	protected abstract int resolveRequestMaxDeliversPerSecond(String enterpriseId);
 
 	/**
 	 * 返还排队发送的数据
@@ -227,12 +259,14 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 			if (request_submiting) {
 				int submitted_result_count = CmppUtils.extractRequestSubmittedRepliedCount(request);
 				int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
-				Log.warn("For a long time not receive reply, return submit to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
 				
 				List<Deliver> submitted_list = (List<Deliver>) CmppUtils.extractRequestSubmitteds(request);
 				List<Deliver> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
 				if (this.errorReturnQueue) {
+					Log.warn("For a long time not receive reply, return submit to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
 					this.returnQueuedDelivers(serviceNumber, unresult_list);
+				} else {
+					Log.warn("For a long time not receive a reply, ignored submits, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
 				}
 				CmppUtils.cleanRequestSubmitteds(request);
 				int transmit_listener_size = ListUtils.size(transmitListener);
@@ -241,7 +275,11 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 						TransmitEvent event = new TransmitEvent(unresult_list.get(ii));
 						for (int i = 0; i < transmit_listener_size; i++) {
 							TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
-							listener.transmitTimeout(event);
+							try {
+								listener.transmitTimeout(event);
+							} catch (Exception e) {
+								Log.error("ignored submit transmit timeout error: " + e.getMessage(), e);
+							}
 						}
 					}
 				}
@@ -252,6 +290,28 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 	}
 	
 	protected void doPostDeliver(Request request, Response response) throws IOException {
+		
+		int currentMaxDeliverPerSecond = CmppUtils.extractRequestMaxDeliverPerSecond(request);
+		
+		//TODO 需要实现从客户配置信息中获取流量控制数目
+		// 上次流量统计的开始时间
+		long flowLastTime = CmppUtils.extractRequestFlowLastTime(request);
+		// 上次统计以来流量总数
+		int flowTotal = CmppUtils.extractRequestFlowTotal(request);
+		// 当前时间
+		long currentTimeMilles = System.currentTimeMillis();
+		if (Log.isDebugEnabled()) {
+			Log.info(String.format("time=%d, interal=%d, total=%d ", currentTimeMilles,
+					(currentTimeMilles - flowLastTime), flowTotal));
+		}
+		// 如果间隔小于1秒和发送总数大于
+		if ((currentTimeMilles - flowLastTime) < 1000 && flowTotal >= currentMaxDeliverPerSecond) {
+			return;
+		} else if ((currentTimeMilles - flowLastTime) >= 1000) {
+			flowLastTime = currentTimeMilles;
+			flowTotal = 0;
+		}
+		
 		Integer submitted = Integer.valueOf(0);
 		String serviceNumber = CmppUtils.extractRequestServiceNumber(request);
 		List<Deliver> takedPostSubmits = null;
@@ -278,7 +338,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 						try {
 							evnListener.beginTransmit(event);
 						} catch (Throwable e) {
-							Log.ignore(e);
+							Log.error("ignored deliver begin transmit error: " + e.getMessage(), e);
 						}
 					}
 				}
@@ -286,6 +346,8 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 					CmppUtils.renderDataPacket(request, response, sb);
 					response.flushBuffer();
 					CmppUtils.updateSubmitteds(request, takedPostSubmits, submitted + 1);
+					flowTotal++;
+					CmppUtils.updateRequestFlowTotal(request, flowLastTime, flowTotal);
 				} catch (IOException e) {
 					if (this.errorReturnQueue) {
 						returnQueuedDelivers(serviceNumber, takedPostSubmits);
@@ -304,7 +366,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 						try {
 							evnListener.transmitted(event);
 						} catch (Throwable e) {
-							Log.ignore(e);
+							Log.error("ignored deliver transmitted error: " + e.getMessage(), e);
 						}
 					}
 				}
@@ -434,9 +496,29 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 	protected void doSubmit(Request request, Response response) throws IOException {
 		super.doSubmit(request, response);
 		String serviceNumber = CmppUtils.extractRequestServiceNumber(request);
-		String serviceSign = CmppUtils.extractRequestServiceSignature(request);
-		int signLen = StringUtils.hasText(serviceSign) ? serviceSign.length() : 0;
-
+		
+		//获取当前请求的最大发送没秒发送数
+		int currentMaxSubmitPerSecond = CmppUtils.extractRequestMaxSubmitPerSecond(request);
+		
+		//TODO 需要实现从客户配置信息中获取流量控制数目
+		// 上次流量统计的开始时间
+		long flowLastTime = CmppUtils.extractRequestReceiveFlowLastTime(request);
+		// 上次统计以来流量总数
+		int flowTotal = CmppUtils.extractRequestReceiveFlowTotal(request);
+		
+		// 当前时间
+		long currentTimeMilles = System.currentTimeMillis();
+		
+		boolean isMaxReceiveFlowLimited = false;
+		//是否超限
+		// 如果间隔小于1秒和发送总数大于
+		if ((currentTimeMilles - flowLastTime) < 1000 && flowTotal > currentMaxSubmitPerSecond) {
+			isMaxReceiveFlowLimited = true;
+		} else if ((currentTimeMilles - flowLastTime) >= 1000) {
+			flowLastTime = currentTimeMilles;
+			flowTotal = 0;
+		}
+		
 		Submit submit = (Submit) CmppUtils.extractRequestPacket(request);
 		//大爷的， 就少这么一个clone...并发上去以后，发现回复好多重复SEQ。。。。
 		// 百思不得其解。。。。。两天时间查了整个代码才发现！！！
@@ -450,10 +532,17 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 		resp.nodeSeq = CmppUtils.generateContextSequence(request.getContext());
 		resp.result = 9;
 		
-		if (!StringUtils.hasText(submit.sourceId) || !submit.sourceId.startsWith(serviceNumber)) {
+		flowTotal++;
+		CmppUtils.updateRequestReceiveFlowTotal(request, flowLastTime, flowTotal);
+		
+		if (isMaxReceiveFlowLimited) {
+			resp.result = -1; //流量超限
+		} else if (!StringUtils.hasText(submit.sourceId) || !submit.sourceId.startsWith(serviceNumber)) {
 			resp.result = 1;
 		} else {
 			boolean submit_valid = false;
+			String serviceSign = CmppUtils.extractRequestServiceSignature(request);
+			int signLen = StringUtils.hasText(serviceSign) ? serviceSign.length() : 0;
 			try {
 				submit_valid = testClientSubmitValid(submit, signLen);
 			} catch (Throwable e) {
@@ -504,15 +593,21 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 	@SuppressWarnings("unchecked")
 	@Override
 	protected void handleDisConnect(Request request, Response response) {
-		if (CmppUtils.testRequestBinded(request) && CmppUtils.testRequestSubmiting(request) && this.errorReturnQueue) {
-			int submitted_result_count = CmppUtils.extractRequestSubmittedRepliedCount(request);
-			int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
-			Log.warn("return submitted to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
-			List<Deliver> submitted_list = (List<Deliver>) CmppUtils.extractRequestSubmitteds(request);
+		if (CmppUtils.testRequestBinded(request)){
 			String serviceNumber = CmppUtils.extractRequestServiceNumber(request);
 			CmppUtils.stepDecrementRequestConnection(request, serviceNumber);
-			returnQueuedDelivers(serviceNumber, submitted_list.subList(submitted_result_count, submitted_count));
-			CmppUtils.cleanRequestSubmitteds(request);
+			if (CmppUtils.testRequestSubmiting(request)) {
+				int submitted_result_count = CmppUtils.extractRequestSubmittedRepliedCount(request);
+				int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
+				if (this.errorReturnQueue) {
+					Log.warn("return submitted to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
+					List<Deliver> submitted_list = (List<Deliver>) CmppUtils.extractRequestSubmitteds(request);
+					this.returnQueuedDelivers(serviceNumber, submitted_list.subList(submitted_result_count, submitted_count));
+				} else {
+					Log.warn("ignore submits, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
+				}
+				CmppUtils.cleanRequestSubmitteds(request);
+			}
 		}
 		super.handleDisConnect(request, response);
 	}

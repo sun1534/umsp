@@ -10,8 +10,9 @@ import com.partsoft.umsp.packet.AbstractDataPacket;
 import com.partsoft.utils.Assert;
 import com.partsoft.utils.HexUtils;
 
-@SuppressWarnings("serial")
 public abstract class SgipDataPacket extends AbstractDataPacket implements DataPacket, Cloneable {
+
+	private static final long serialVersionUID = -6138701092774894007L;
 
 	public static final int RESERVE_SIZE = 8;
 

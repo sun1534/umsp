@@ -8,9 +8,10 @@ import java.util.UUID;
 
 import com.partsoft.umsp.DataPacket;
 
-@SuppressWarnings("serial")
 public abstract class AbstractDataPacket implements DataPacket, Serializable, Cloneable {
 	
+	private static final long serialVersionUID = 8243610090627927301L;
+
 	public String srev1;
 	
 	public String srev2;

@@ -41,12 +41,17 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 	/**
 	 * @brief 一次最多发送16条
 	 */
-	protected int _maxOnceSubmits = 16;
+	protected int _maxOnceSubmits = 10;
+	
+	/**
+	 * 最大每秒提交数
+	 */
+	protected int maxSubmitPerSecond = 50;
 	
 	/**
 	 * 发生错误时是否返回队列
 	 */
-	protected boolean errorReturnQueue = false;
+	protected boolean errorReturnQueue = true;
 
 	protected int _loginMode = LoginModes.TRANSMIT;
 
@@ -140,11 +145,6 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 	 */
 	protected abstract void doReceivedReport(Deliver report);
 
-	/**
-	 * 最大每秒提交数
-	 */
-	protected int maxSubmitPerSecond = 50;
-
 	@Override
 	protected void handleTimeout(Request request, Response response) throws IOException {
 		long request_idle_time = System.currentTimeMillis() - request.getRequestTimestamp();
@@ -170,11 +170,13 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 				// 如果有submit再队列中，则回退。
 				int submitted_result_count = SmgpUtils.extractRequestSubmittedRepliedCount(request);
 				int submitted_count = SmgpUtils.extractRequestSubmittedCount(request);
-				Log.warn("For a long time did not receive a reply, return submit to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
 				List<Submit> submitted_list = SmgpUtils.extractRequestSubmitteds(request);
 				List<Submit> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
 				if (this.errorReturnQueue) {
+					Log.warn("For a long time not receive a reply, return to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
 					returnQueuedSubmits(unresult_list);
+				} else {
+					Log.warn("For a long time not receive a reply, ignored submits, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
 				}
 				SmgpUtils.cleanRequestSubmitteds(request);
 				int transmit_listener_size = ListUtils.size(transmitListener);
@@ -183,7 +185,11 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 						TransmitEvent event = new TransmitEvent(unresult_list.get(ii));
 						for (int i = 0; i < transmit_listener_size; i++) {
 							TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
-							listener.transmitTimeout(event);
+							try {
+								listener.transmitTimeout(event);
+							} catch (Exception e) {
+								Log.error("ignored submit transmit timeout error: " + e.getMessage(), e);
+							}
 						}
 					}
 				}
@@ -198,12 +204,16 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 
 	@Override
 	protected void handleDisConnect(Request request, Response response) {
-		if (SmgpUtils.testRequestBinded(request) && SmgpUtils.testRequestSubmiting(request) && this.errorReturnQueue) {
-			List<Submit> submitts = SmgpUtils.extractRequestSubmitteds(request);
+		if (SmgpUtils.testRequestBinded(request) && SmgpUtils.testRequestSubmiting(request)) {
 			int submittedCount = SgipUtils.extractRequestSubmittedCount(request);
 			int submittedResultCount = SgipUtils.extractRequestSubmittedRepliedCount(request);
-			Log.warn("return submitted to queue, submit-count=" + submittedCount + ", reply-count=" + submittedResultCount);
-			returnQueuedSubmits(submitts.subList(submittedResultCount, submittedCount));
+			if (this.errorReturnQueue) {
+				Log.warn("return submitted to queue, submit-count=" + submittedCount + ", reply-count=" + submittedResultCount);
+				List<Submit> submitts = SmgpUtils.extractRequestSubmitteds(request);
+				returnQueuedSubmits(submitts.subList(submittedResultCount, submittedCount));
+			} else {
+				Log.warn("ignore submits, submit-count=" + submittedCount + ", reply-count=" + submittedResultCount);
+			}
 		}
 		super.handleDisConnect(request, response);
 	}
@@ -253,7 +263,7 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 					try {
 						evnListener.beginTransmit(event);
 					} catch (Throwable e) {
-						Log.ignore(e);
+						Log.error("ignored submit begin transmit error: " + e.getMessage(), e);
 					}
 				}
 			}
@@ -282,7 +292,7 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 					try {
 						evnListener.transmitted(event);
 					} catch (Throwable e) {
-						Log.ignore(e);
+						Log.error("ignored submit transmit error: " + e.getMessage(), e);
 					}
 				}
 			}

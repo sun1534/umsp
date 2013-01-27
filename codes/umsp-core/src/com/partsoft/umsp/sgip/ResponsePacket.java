@@ -7,8 +7,9 @@ import java.io.IOException;
 import com.partsoft.umsp.io.Buffer;
 import com.partsoft.umsp.sgip.Constants.BindResults;
 
-@SuppressWarnings("serial")
 public class ResponsePacket extends SgipDataPacket {
+
+	private static final long serialVersionUID = 4279081553535071020L;
 
 	public static final int PACKET_SIZE = SgipDataPacket.PACKET_SIZE + Buffer.BYTE_SIZE;
 

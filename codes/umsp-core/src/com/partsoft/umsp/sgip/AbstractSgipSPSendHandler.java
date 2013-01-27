@@ -23,7 +23,7 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 
 	private boolean retrySubmit = false;
 
-	protected int maxOnceSubmits = 32;
+	protected int maxOnceSubmits = 10;
 
 	protected int maxRequestIdleTime = 1000 * 60;
 
@@ -34,7 +34,7 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 	/**
 	 * 发生错误时是否返回队列
 	 */
-	protected boolean errorReturnQueue = false;
+	protected boolean errorReturnQueue = true;
 
 	public boolean isAutoReSubmit() {
 		return retrySubmit;
@@ -129,11 +129,13 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 			if (SgipUtils.testRequestSubmiting(request)) {
 				int submitted_result_count = SgipUtils.extractRequestSubmittedRepliedCount(request);
 				int submitted_count = SgipUtils.extractRequestSubmittedCount(request);
-				Log.warn("For a long time did not receive a reply, return submit to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
 				List<Submit> submitted_list = SgipUtils.extractRequestSubmitteds(request);
 				List<Submit> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
 				if (this.errorReturnQueue) {
+					Log.warn("For a long time not receive a reply, return submit to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
 					returnQueuedSubmits(unresult_list);
+				} else {
+					Log.warn("For a long time not receive a reply, ignored submits, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
 				}
 				SgipUtils.cleanRequestSubmitteds(request);
 				int transmit_listener_size = ListUtils.size(transmitListener);
@@ -142,7 +144,11 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 						TransmitEvent event = new TransmitEvent(unresult_list.get(ii));
 						for (int i = 0; i < transmit_listener_size; i++) {
 							TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
-							listener.transmitTimeout(event);
+							try {
+								listener.transmitTimeout(event);
+							} catch (Exception e) {
+								Log.error("ignored submit transmit timeout error: " + e.getMessage(), e);
+							}
 						}
 					}
 				}
@@ -189,7 +195,7 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 				SgipUtils.stuffSerialNumber(sb, request, node_id, sb.createTimeMillis);
 				sb.node_id = node_id;
 				sb.timestamp = CalendarUtils.getTimestampInYearDuring(sb.createTimeMillis);
-				sb.sequence = SgipUtils.generateRequestSequence(request);
+				sb.sequence = SgipUtils.generateContextSequence(request.getContext());
 
 				int transmit_listener_size = ListUtils.size(transmitListener);
 				if (transmit_listener_size > 0) {
@@ -199,7 +205,7 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 						try {
 							evnListener.beginTransmit(event);
 						} catch (Throwable e) {
-							Log.ignore(e);
+							Log.error("ignored submit begin transmit error: " + e.getMessage(), e);
 						}
 					}
 				}
@@ -228,7 +234,7 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 						try {
 							evnListener.transmitted(event);
 						} catch (Throwable e) {
-							Log.ignore(e);
+							Log.error("ignored submit transmit error: " + e.getMessage(), e);
 						}
 					}
 				}
@@ -341,12 +347,16 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 
 	@Override
 	protected void handleDisConnect(Request request, Response response) {
-		if (SgipUtils.testRequestBinded(request) && SgipUtils.testRequestSubmiting(request) && this.errorReturnQueue) {
-			List<Submit> submitts = SgipUtils.extractRequestSubmitteds(request);
+		if (SgipUtils.testRequestBinded(request) && SgipUtils.testRequestSubmiting(request)) {
 			int submittedCount = SgipUtils.extractRequestSubmittedCount(request);
 			int submittedResultCount = SgipUtils.extractRequestSubmittedRepliedCount(request);
-			Log.warn("return submitted to queue, submit-count=" + submittedCount + ", reply-count=" + submittedResultCount);
-			returnQueuedSubmits(submitts.subList(submittedResultCount, submittedCount));
+			if (this.errorReturnQueue) {
+				Log.warn("return submitted to queue, submit-count=" + submittedCount + ", reply-count=" + submittedResultCount);
+				List<Submit> submitts = SgipUtils.extractRequestSubmitteds(request);
+				returnQueuedSubmits(submitts.subList(submittedResultCount, submittedCount));
+			} else {
+				Log.warn("ignore submits, submit-count=" + submittedCount + ", reply-count=" + submittedResultCount);
+			}
 		}
 		super.handleDisConnect(request, response);
 	}

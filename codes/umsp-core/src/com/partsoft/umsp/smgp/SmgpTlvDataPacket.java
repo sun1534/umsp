@@ -7,9 +7,10 @@ import java.io.Serializable;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-@SuppressWarnings("serial")
 public abstract class SmgpTlvDataPacket extends SmgpDataPacket {
 
+	private static final long serialVersionUID = 2652914114267757671L;
+	
 	private Map<Short, SmgpTlvData> tlvDatas;
 
 	public SmgpTlvDataPacket(int command) {

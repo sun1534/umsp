@@ -22,17 +22,15 @@ public class PacketClientConnector extends AbstractConnector {
 	protected int _connectTimeout = 1500;
 
 	/**
-	 * @brief 重连间隔时间，单位：毫秒，默认值（6秒）
+	 * @brief 重连间隔时间，单位：毫秒，默认值（30秒）
 	 */
-	protected long _reConnectIntervalTime = 6000;
+	protected long _reConnectIntervalTime = 30000;
 
 	protected boolean _autoReConnect = false;
 
 	private Proxy proxy;
 
 	private int _dispatchedConnections = 0;
-
-	protected int _successConnect = 0;
 
 	public PacketClientConnector() {
 	}
@@ -150,7 +148,6 @@ public class PacketClientConnector extends AbstractConnector {
 		super.doStart();
 		// Start selector thread
 		_dispatchedConnections = 0;
-		_successConnect = 0;
 		Assert.isTrue(_maxConnection > 0);
 		synchronized (this) {
 			_dispatchedThreads = new Thread[1];
@@ -173,9 +170,6 @@ public class PacketClientConnector extends AbstractConnector {
 	@Override
 	protected void connectionOpened(PacketConnection connection) {
 		super.connectionOpened(connection);
-//		synchronized (this) {
-//			_dispatchedConnections++;
-//		}
 	}
 
 	@Override
@@ -184,10 +178,8 @@ public class PacketClientConnector extends AbstractConnector {
 		synchronized (this) {
 			_dispatchedConnections--;
 		}
+		
 		if (isAutoReConnect()) {
-			synchronized (this) {
-				_successConnect--;
-			}
 			return;
 		}
 
@@ -223,40 +215,46 @@ public class PacketClientConnector extends AbstractConnector {
 			int old_priority = current.getPriority();
 			try {
 				current.setPriority(old_priority - getAcceptorPriorityOffset());
-				boolean connect_error = false;
-				do {
-					synchronized (PacketClientConnector.this) {
-						if (_dispatchedConnections < getMaxConnection()) {
-							try {
-								connect(_dispatchedConnections);
-								if (!isStarted()) break;
-								_successConnect++;
-								connect_error = false;
-							} catch (Throwable e) {
-								Log.error(e.getMessage(), e);
-								connect_error = true;
-							}
-						}
+				for (int i = 0; i < getMaxConnection() && isStarted(); i++) {
+					if (Log.isDebugEnabled()) {
+						Log.debug(String.format("connect to server %s", getName()));
 					}
-					int sleepCount = 0;
-					while (isStarted() && ((sleepCount * SLEEP_TIME) < getReConnectIntervalTime())) {
-						sleepCount = sleepCount + 1;
-						try {
-							Thread.sleep(SLEEP_TIME);
-						} catch (InterruptedException e) {
-							break;
-						}
-						if (!isStarted()) break;
+					try {
+						connect(i);
+						Thread.sleep(100);
+					} catch (Throwable e) {
+						Log.error(e.getMessage(), e);
+						break;
+					}
+				}
+				
+				int sleepCount = 0;
+				while (isStarted()) {
+					try {
+						Thread.sleep(SLEEP_TIME);
+					} catch (InterruptedException e) {
+						break;
+					}
+					sleepCount = sleepCount + 1;
+					if (!isStarted()) break;
+					
+					if ((sleepCount * SLEEP_TIME) > getReConnectIntervalTime()) {
 						synchronized (PacketClientConnector.this) {
-							if (_successConnect < getMaxConnection()) {
-								break;
+							if (_dispatchedConnections < getMaxConnection()) {
+								if (Log.isDebugEnabled()) {
+									Log.debug(String.format("reconnect to server %s", getName()));
+								}
+								try {
+									connect(_dispatchedConnections);
+									Thread.sleep(100);
+								} catch (Throwable e) {
+									Log.error(e.getMessage(), e);
+								}
 							}
 						}
-						if (!connect_error) {
-							break;
-						}
+						sleepCount = 0;
 					}
-				} while(isStarted());
+				}
 			} finally {
 				current.setPriority(old_priority);
 				current.setName(name);
@@ -283,15 +281,13 @@ public class PacketClientConnector extends AbstractConnector {
 			MultiException mex = new MultiException();
 			try {
 				current.setPriority(old_priority - getAcceptorPriorityOffset());
-				while (connectioned++ < getMaxConnection()) {
+				for (; connectioned < getMaxConnection() && isStarted(); connectioned++) {
 					try {
 						if (Log.isDebugEnabled()) {
-							Log.debug(String.format("connec to server %s", getName()));
+							Log.debug(String.format("connect to server %s", getName()));
 						}
 						connect(connectioned);
-						synchronized (PacketClientConnector.this) {
-							_successConnect++;
-						}
+						Thread.sleep(100);
 					} catch (Throwable e) {
 						mex.add(e);
 					}
@@ -302,7 +298,7 @@ public class PacketClientConnector extends AbstractConnector {
 				synchronized (PacketClientConnector.this) {
 					if (_dispatchedThreads != null)
 						_dispatchedThreads[_connector] = null;
-					if (_successConnect <= 0) {
+					if (connectioned <= 0) {
 						try {
 							mex.ifExceptionThrow();
 						} catch (Exception e) {

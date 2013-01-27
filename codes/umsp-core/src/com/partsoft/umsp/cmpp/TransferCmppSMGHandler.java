@@ -82,6 +82,16 @@ public class TransferCmppSMGHandler extends AbstractCmppSMGContextHandler {
 	protected void afterSuccessClientConnected(Request request, Response response) {
 
 	}
+	
+	@Override
+	protected int resolveRequestMaxSubmitsPerSecond(String enterpriseId) {
+		return clientInfoGetter.getMaxSubmitPerSecond(enterpriseId);
+	}
+
+	@Override
+	protected int resolveRequestMaxDeliversPerSecond(String enterpriseId) {
+		return clientInfoGetter.getMaxDeliverPerSecond(enterpriseId);
+	}
 
 	@Override
 	protected String resolveRequestServiceNumber(String enterpriseId) {

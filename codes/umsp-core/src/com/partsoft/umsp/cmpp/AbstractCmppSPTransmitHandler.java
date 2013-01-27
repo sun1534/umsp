@@ -33,7 +33,7 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 	/**
 	 * @brief 一次最多发送16条 （默认参数）
 	 */
-	protected int _maxOnceSubmits = 16;
+	protected int _maxOnceSubmits = 10;
 
 	/**
 	 * 最大每秒提交数
@@ -43,7 +43,7 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 	/**
 	 * 发生错误时是否返回队列
 	 */
-	protected boolean errorReturnQueue = false;
+	protected boolean errorReturnQueue = true;
 	
 	/**
 	 * 确认是否返回度列
@@ -161,11 +161,13 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 			if (request_submiting) {
 				int submitted_result_count = CmppUtils.extractRequestSubmittedRepliedCount(request);
 				int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
-				Log.warn("For a long time did not receive a reply, return submit to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
 				List<Submit> submitted_list = (List<Submit>) CmppUtils.extractRequestSubmitteds(request);
 				List<Submit> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
 				if (this.errorReturnQueue) {
+					Log.warn("For a long time not receive a reply, return submit to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
 					returnQueuedSubmits(unresult_list);
+				} else {
+					Log.warn("For a long time did not receive a reply, ignored submits, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
 				}
 				CmppUtils.cleanRequestSubmitteds(request);
 				int transmit_listener_size = ListUtils.size(transmitListener);
@@ -174,7 +176,11 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 						TransmitEvent event = new TransmitEvent(unresult_list.get(ii));
 						for (int i = 0; i < transmit_listener_size; i++) {
 							TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
-							listener.transmitTimeout(event);
+							try {
+								listener.transmitTimeout(event);
+							} catch (Exception e) {
+								Log.error("ignored submit transmit timeout error: " + e.getMessage(), e);
+							}
 						}
 					}
 				}
@@ -186,12 +192,16 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 	@SuppressWarnings("unchecked")
 	@Override
 	protected void handleDisConnect(Request request, Response response) {
-		if (CmppUtils.testRequestBinded(request) && CmppUtils.testRequestSubmiting(request) && this.errorReturnQueue) {
+		if (CmppUtils.testRequestBinded(request)&& CmppUtils.testRequestSubmiting(request)) {
 			int submitted_result_count = CmppUtils.extractRequestSubmittedRepliedCount(request);
 			int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
-			Log.warn("return submitted to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
-			List<Submit> submitted_list = (List<Submit>) CmppUtils.extractRequestSubmitteds(request);
-			returnQueuedSubmits(submitted_list.subList(submitted_result_count, submitted_count));
+			if (this.errorReturnQueue) {
+				Log.warn("return submitted to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
+				List<Submit> submitted_list = (List<Submit>) CmppUtils.extractRequestSubmitteds(request);
+				returnQueuedSubmits(submitted_list.subList(submitted_result_count, submitted_count));
+			} else {
+				Log.warn("ignore submits, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
+			}
 			CmppUtils.cleanRequestSubmitteds(request);
 		}
 		super.handleDisConnect(request, response);
@@ -244,7 +254,7 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 						try {
 							evnListener.beginTransmit(event);
 						} catch (Throwable e) {
-							Log.ignore(e);
+							Log.error("ignored submit begin transmit error: " + e.getMessage(), e);
 						}
 					}
 				}
@@ -272,7 +282,7 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 						try {
 							evnListener.transmitted(event);
 						} catch (Throwable e) {
-							Log.ignore(e);
+							Log.error("ignored submit transmit error: " + e.getMessage(), e);
 						}
 					}
 				}
@@ -351,7 +361,7 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 					try {
 						evnListener.endTransmit(event);
 					} catch (Throwable e) {
-						Log.ignore(e);
+						Log.error("ignored submit end transmit error: " + e.getMessage(), e);
 					}
 				}
 			}
