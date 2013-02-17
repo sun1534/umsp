@@ -600,11 +600,11 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 				int submitted_result_count = CmppUtils.extractRequestSubmittedRepliedCount(request);
 				int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
 				if (this.errorReturnQueue) {
-					Log.warn("return submitted to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
+					Log.warn("return submitted to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_result_count);
 					List<Deliver> submitted_list = (List<Deliver>) CmppUtils.extractRequestSubmitteds(request);
 					this.returnQueuedDelivers(serviceNumber, submitted_list.subList(submitted_result_count, submitted_count));
 				} else {
-					Log.warn("ignore submits, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
+					Log.warn("ignore submits, submit-count=" + submitted_count + ", reply-count=" + submitted_result_count);
 				}
 				CmppUtils.cleanRequestSubmitteds(request);
 			}

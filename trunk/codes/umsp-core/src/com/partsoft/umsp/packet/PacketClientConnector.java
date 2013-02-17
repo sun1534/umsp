@@ -10,6 +10,7 @@ import com.partsoft.umsp.EndPoint;
 import com.partsoft.umsp.MultiException;
 import com.partsoft.umsp.io.Buffer;
 import com.partsoft.umsp.io.ByteArrayBuffer;
+import com.partsoft.umsp.io.EofException;
 import com.partsoft.umsp.log.Log;
 import com.partsoft.utils.Assert;
 
@@ -31,10 +32,11 @@ public class PacketClientConnector extends AbstractConnector {
 	private Proxy proxy;
 
 	private int _dispatchedConnections = 0;
-
+	
+	
 	public PacketClientConnector() {
 	}
-
+	
 	public PacketClientConnector(String host, int port) {
 		super();
 		setHost(host);
@@ -161,9 +163,15 @@ public class PacketClientConnector extends AbstractConnector {
 
 	@Override
 	protected void connectionException(PacketConnection connection, Throwable e) {
-		super.connectionException(connection, e);
-		if (!isAutoReConnect()) {
-			getOrigin().pushDelayException(e);
+		boolean log_exception = true;
+		if (e instanceof EofException && isIgnoredEofException()) {
+			log_exception = false;
+		}
+		if (log_exception) {
+			super.connectionException(connection, e);
+			if (!isAutoReConnect()) {
+				getOrigin().pushDelayException(e);
+			}
 		}
 	}
 

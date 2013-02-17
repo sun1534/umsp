@@ -69,6 +69,16 @@ public abstract class AbstractConnector extends AbstractBuffers implements Conne
 
 	transient int _connectionsRequestsMin; // min requests per connection
 	transient int _connectionsRequestsMax; // max requests per connection
+	
+	private boolean _ignoredEofException = true;
+	
+	public void setIgnoredEofException(boolean ignoredEofException) {
+		this._ignoredEofException = ignoredEofException;
+	}
+	
+	public boolean isIgnoredEofException() {
+		return _ignoredEofException;
+	}
 
 	public AbstractConnector() {
 		this._protocol = "UNKNOWN";
@@ -457,7 +467,13 @@ public abstract class AbstractConnector extends AbstractBuffers implements Conne
 	}
 
 	protected void connectionException(PacketConnection connection, Throwable e) {
-		Log.error(connection.toString() + " handler error: " + e.getMessage(), e);
+		boolean log_exception = true;
+		if (e instanceof EofException && isIgnoredEofException()) {
+			log_exception = false;
+		}
+		if (log_exception) {
+			Log.error(connection.toString() + " handler error: " + e.getMessage(), e);
+		}
 	}
 
 	protected void connectionClosed(PacketConnection connection) {

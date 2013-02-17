@@ -1,6 +1,8 @@
 package com.partsoft.umsp.handler;
 
-public class HandleException extends RuntimeException {
+import com.partsoft.umsp.UmspException;
+
+public class HandleException extends UmspException {
 
 	private static final long serialVersionUID = -1870326620030346018L;
 
@@ -23,6 +25,12 @@ public class HandleException extends RuntimeException {
 	public HandleException(Object transmitObject) {
 		super();
 		this.handleObject = transmitObject;
+	}
+	
+	@Override
+	public void finalize() {
+		super.finalize();
+		this.handleObject = null;
 	}
 
 	public HandleException(String message, Object transmitObject) {
