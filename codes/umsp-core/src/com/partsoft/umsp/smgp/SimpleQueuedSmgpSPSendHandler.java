@@ -29,6 +29,12 @@ public class SimpleQueuedSmgpSPSendHandler extends BatchPoolSmgpSPSendHandler {
 			public boolean isPooling() {
 				return getContextSubmitQueue().size() > 0;
 			}
+			
+			public int countPooling(int maxLength) {
+				int countResult = getContextSubmitQueue().size() ;
+				return countResult < maxLength ? countResult : maxLength;
+			}
+			
 		});
 	}
 	

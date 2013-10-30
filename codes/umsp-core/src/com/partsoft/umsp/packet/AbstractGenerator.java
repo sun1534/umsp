@@ -47,14 +47,12 @@ public abstract class AbstractGenerator implements Generator {
 
 		synchronized (this) {
 			if (returnBuffers) {
-				if (_buffer != null)
-					_buffers.returnBuffer(_buffer);
-				_buffer = null;
-			} else {
 				if (_buffer != null) {
-					_buffers.returnBuffer(_buffer);
+					_buffers.returnBuffer(_contentBufferSize, _buffer);
 					_buffer = null;
 				}
+			} else if (_buffer != null){
+				_buffer.clear();
 			}
 		}
 		_content = null;
@@ -87,7 +85,7 @@ public abstract class AbstractGenerator implements Generator {
 			if (_buffer != null) {
 				Buffer nb = _buffers.getBuffer(_contentBufferSize);
 				nb.put(_buffer);
-				_buffers.returnBuffer(_buffer);
+				_buffers.returnBuffer(_contentBufferSize, _buffer);
 				_buffer = nb;
 			}
 		}

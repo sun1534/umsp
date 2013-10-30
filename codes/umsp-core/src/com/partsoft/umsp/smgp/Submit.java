@@ -3,7 +3,6 @@ package com.partsoft.umsp.smgp;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.HashSet;
 
 import com.partsoft.umsp.Constants.MessageCodes;
@@ -19,24 +18,30 @@ import com.partsoft.utils.StringUtils;
 public class Submit extends SmgpTlvDataPacket {
 
 	private static final long serialVersionUID = 2L;
+	
+	public int nodeId;
+	
+	public int nodeTime;
+	
+	public int nodeSeq;
 
-	public byte MsgType;// 1 integer 0＝MO 消息（终端发给SP）；
-	// 6＝MT 消息（SP 发给终端，包括WEB 上发送的点对点短消息）；
+	public byte MsgType;// 1 integer 0＝MO 消息(终端发给SP)；
+	// 6＝MT 消息(SP 发给终端，包括WEB 上发送的点对点短消息)；
 	// 7＝点对点短消息；
 
-	public byte NeedReport;// 1 integer 是否要求返回状态报告（0=不要求，=要求）
+	public byte NeedReport;// 1 integer 是否要求返回状态报告(0=不要求，=要求)
 
-	public int Priority;// 1 Integer 发送优先级（从0到9）
+	public int Priority;// 1 Integer 发送优先级(从0到9)
 
 	public String ServiceID;// 10 Octet String 业务类型
 
-	public String FeeType;// 2 Octet String 收费类型（参见收费类型代码表）
+	public String FeeType;// 2 Octet String 收费类型(参见收费类型代码表)
 
-	public String FeeCode;// 6 Octet String 资费代码（单位为分）
+	public String FeeCode;// 6 Octet String 资费代码(单位为分)
 
 	public String FixedFee;// 6 包月封顶
 
-	public byte MsgFormat;// 1 Octet String 短消息格式（参见短消息格式代码表）
+	public byte MsgFormat;// 1 Octet String 短消息格式(参见短消息格式代码表)
 
 	public String ValidTime;// 17 Octet String 有效时间，格式遵循SMPP3.3协议
 
@@ -46,17 +51,18 @@ public class Submit extends SmgpTlvDataPacket {
 
 	public String ChargeTermID;// 21 Octet String 计费用户号码
 
-	public int DestTermIDCount;// 1 Integer 短消息接收号码总数（≤100）
+	public int DestTermIDCount;// 1 Integer 短消息接收号码总数(≤100)
 
 	public String[] DestTermID;// 21* DestTerm Count Octet String
-								// 短消息接收号码（连续存储DestTermIDCount个号码）
+								// 短消息接收号码(连续存储DestTermIDCount个号码)
 	public int MsgLength;// 1 Integer 短消息长度
 
 	public byte[] MsgContent;// ≤252 Octet String 短消息内容
 
 	public String Reserve;// 8 Octet String 保留
 
-//	protected byte tp_udhi;
+	// 提交次数
+	public int submitCount;
 
 	public Submit() {
 		super(RequestIDs.submit);
@@ -119,7 +125,8 @@ public class Submit extends SmgpTlvDataPacket {
 		in.readFully(MsgContent, 0, MsgLength);
 		Reserve = readFixedString(in, 8);
 		readTlvDatas(in);
-//		tp_udhi = this.hasDynamicProperty(TlvTags.TP_udhi) ? getDynamicProperty(TlvTags.TP_udhi)[0] : 0;
+		// tp_udhi = this.hasDynamicProperty(TlvTags.TP_udhi) ?
+		// getDynamicProperty(TlvTags.TP_udhi)[0] : 0;
 	}
 
 	@Override
@@ -131,13 +138,13 @@ public class Submit extends SmgpTlvDataPacket {
 		MsgFormat = (byte) code;
 		MsgContent = UmspUtils.toGsmBytes(msg, code);
 		MsgLength = MsgContent == null ? 0 : MsgContent.length;
-//		tp_udhi = 0;
-		this.setTp_udhi((byte)0);
-		this.setPkTotal((byte)0);
-		this.setPkNumber((byte)0);
-		//this.removeDynamicProperty(TlvTags.TP_udhi);
-		//this.removeDynamicProperty(TlvTags.PkTotal);
-		//this.removeDynamicProperty(TlvTags.PkNumber);
+		// tp_udhi = 0;
+		this.setTp_udhi((byte) 0);
+		this.setPkTotal((byte) 0);
+		this.setPkNumber((byte) 0);
+		// this.removeDynamicProperty(TlvTags.TP_udhi);
+		// this.removeDynamicProperty(TlvTags.PkTotal);
+		// this.removeDynamicProperty(TlvTags.PkNumber);
 	}
 
 	public void setMessageContent(String msg) {
@@ -166,7 +173,7 @@ public class Submit extends SmgpTlvDataPacket {
 			}
 		}
 	}
-	
+
 	public String getUserNumbersTrimCNPrefix() {
 		StringBuffer buffer = new StringBuffer(this.DestTermIDCount * 21);
 		boolean appended = false;
@@ -225,7 +232,7 @@ public class Submit extends SmgpTlvDataPacket {
 		if (getTp_udhi() == 1 && (this.MsgContent[1] == 0)) {
 			return UmspUtils.fromGsmBytes(MsgContent, 6, MsgLength - 6, MsgFormat);
 		} else {
-			//TODO 还可能需要做更多的内容判断
+			// TODO 还可能需要做更多的内容判断
 			return UmspUtils.fromGsmBytes(MsgContent, 0, MsgLength, MsgFormat);
 		}
 	}
@@ -251,12 +258,14 @@ public class Submit extends SmgpTlvDataPacket {
 		this.MsgFormat = (byte) messageCode;
 		this.MsgLength = byte_buffer.length();
 		this.MsgContent = byte_buffer.array();
-		setTp_udhi((byte)1);
-		setPkTotal((byte)count);
-		setPkNumber((byte)index);
-//		this.setDynamicProperty(TlvTags.TP_udhi, new byte[] { 1 });
-//		this.setDynamicProperty(TlvTags.PkTotal, new byte[] { (byte) count });
-//		this.setDynamicProperty(TlvTags.PkNumber, new byte[] { (byte) index });
+		setTp_udhi((byte) 1);
+		setPkTotal((byte) count);
+		setPkNumber((byte) index);
+		// this.setDynamicProperty(TlvTags.TP_udhi, new byte[] { 1 });
+		// this.setDynamicProperty(TlvTags.PkTotal, new byte[] { (byte) count
+		// });
+		// this.setDynamicProperty(TlvTags.PkNumber, new byte[] { (byte) index
+		// });
 	}
 
 	public byte getTp_pid() {
@@ -435,18 +444,12 @@ public class Submit extends SmgpTlvDataPacket {
 
 	@Override
 	public String toString() {
-		return "Submit [MsgType=" + MsgType + ", NeedReport=" + NeedReport + ", Priority=" + Priority + ", ServiceID="
-				+ ServiceID + ", FeeType=" + FeeType + ", FeeCode=" + FeeCode + ", FixedFee=" + FixedFee
-				+ ", MsgFormat=" + MsgFormat + ", ValidTime=" + ValidTime + ", AtTime=" + AtTime + ", SrcTermID="
-				+ SrcTermID + ", ChargeTermID=" + ChargeTermID + ", DestTermIDCount=" + DestTermIDCount
-				+ ", DestTermID=" + Arrays.toString(DestTermID) + ", MsgLength=" + MsgLength + ", Reserve=" + Reserve
-				+ ", tp_udhi=" + getTp_udhi() + ", getMessageContent()=" + getMessageContent() + ", getTp_pid()="
-				+ getTp_pid() + ", getTp_udhi()=" + getTp_udhi() + ", getLinkId()=" + getLinkId() + ", getMsgSrc()="
-				+ getMsgSrc() + ", getChargeUserType()=" + getChargeUserType() + ", getChargeTermType()="
-				+ getChargeTermType() + ", getChargeTermPseudo()=" + getChargeTermPseudo() + ", getDestTermTypeType()="
-				+ getDestTermTypeType() + ", getPkTotal()=" + getPkTotal() + ", getPkNumber()=" + getPkNumber()
-				+ ", getSubmitMsgType()=" + getSubmitMsgType() + ", getSPDealResult()=" + getSPDealResult()
-				+ ", getMServiceID()=" + getMServiceID() + ", getDestTermPseudo()=" + getDestTermPseudo() + "]";
+		return "电信SMGP短信提交包 [消息类型=" + MsgType + ", 是否需要报告=" + NeedReport + ", 优先级=" + Priority + ", 服务代码=" + ServiceID
+				+ ", 计费类型=" + FeeType + ", 计费代码=" + FeeCode + ", 固定费率=" + FixedFee + ", 消息格式=" + MsgFormat + ", 有效时间="
+				+ ValidTime + ", 定时发送=" + AtTime + ", 发送号码=" + SrcTermID + ", 计费号码=" + ChargeTermID + ", 目标号码数="
+				+ DestTermIDCount + ", 目标号码=" + getUserNumbers() + ", 短信长度=" + MsgLength + ", TP_UDHI=" + getTp_udhi()
+				+ ", 短信内容=" + getMessageContent() + ", TP_PID=" + getTp_pid() + ", TP_UDHI=" + getTp_udhi()
+				+ ", 业务唯一标识=" + getLinkId() + ", 长短信拆分总计=" + getPkTotal() + ", 长短信标识=" + getPkNumber() + "]";
 	}
 
 }

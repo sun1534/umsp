@@ -93,6 +93,7 @@ public abstract class AbstractSgipSPReceiveHandler extends AbstractSgipContextSP
 		byte result = 9;
 		try {
 			doReceivedReport(report_packet);
+			result = 0;
 		} catch (Throwable e) {
 			Log.error(e.getMessage(), e);
 		}

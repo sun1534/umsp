@@ -4,6 +4,6 @@ public interface BufferPools {
 	
 	public Buffer getBuffer(int size);
 
-	public void returnBuffer(Buffer buffer);
+	public void returnBuffer(int size, Buffer buffer);
 	
 }

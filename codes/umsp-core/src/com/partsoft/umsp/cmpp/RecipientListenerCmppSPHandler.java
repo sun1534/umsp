@@ -29,13 +29,13 @@ public class RecipientListenerCmppSPHandler extends AbstractCmppSPTransmitHandle
 	}
 
 	@Override
-	protected List<Submit> takeQueuedSubmits() {
+	protected List<Submit> takeQueuedSubmits(int count) {
 		return null;
 	}
 
 	@Override
-	protected boolean testQueuedSubmits() {
-		return false;
+	protected int testQueuedSubmits() {
+		return 0;
 	}
 	
 	@Override

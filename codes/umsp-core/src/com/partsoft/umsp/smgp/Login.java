@@ -8,23 +8,23 @@ import com.partsoft.umsp.smgp.Constants.RequestIDs;
 import com.partsoft.utils.HexUtils;
 
 public class Login extends SmgpDataPacket {
-	
-	private static final long serialVersionUID = 1L;
-	
-	public String ClientID;//	8	Octet String
 
-	public byte[] AuthenticatorClient;//	16	Octet String
-	
-	public int LoginMode;//	1	Integer
-	
-	public int TimeStamp;//	4	Integer
-	
-	public byte Version = Constants.VERSION;//	1	integer
+	private static final long serialVersionUID = 1L;
+
+	public String ClientID;// 8 Octet String
+
+	public byte[] AuthenticatorClient;// 16 Octet String
+
+	public int LoginMode;// 1 Integer
+
+	public int TimeStamp;// 4 Integer
+
+	public byte Version = Constants.VERSION;// 1 integer
 
 	public Login() {
 		super(RequestIDs.login);
 	}
-	
+
 	@Override
 	protected void writeDataOutput(DataOutput out) throws IOException {
 		super.writeDataOutput(out);
@@ -34,12 +34,12 @@ public class Login extends SmgpDataPacket {
 		out.writeInt(TimeStamp);
 		out.writeByte(Version);
 	}
-	
+
 	@Override
 	protected void readDataInput(DataInput in) throws IOException {
 		super.readDataInput(in);
 		ClientID = readFixedString(in, 8);
-		
+
 		AuthenticatorClient = new byte[16];
 		in.readFully(AuthenticatorClient, 0, 16);
 		LoginMode = in.readByte();
@@ -51,7 +51,7 @@ public class Login extends SmgpDataPacket {
 	public int getDataSize() {
 		return super.getDataSize() + 30;
 	}
-	
+
 	@Override
 	public Login clone() {
 		return (Login) super.clone();
@@ -59,8 +59,8 @@ public class Login extends SmgpDataPacket {
 
 	@Override
 	public String toString() {
-		return "Login [ClientID=" + ClientID + ", AuthenticatorClient=" + HexUtils.toHex(AuthenticatorClient) + ", LoginMode="
-				+ LoginMode + ", TimeStamp=" + TimeStamp + ", Version=" + Version + "]";
+		return "电信SMGP连接请求包 [客户编号=" + ClientID + ", 协商密钥=" + HexUtils.toHex(AuthenticatorClient) + ", 请求类型="
+				+ LoginMode + ", 时间戳=" + TimeStamp + ", 版本=" + Version + "]";
 	}
-	
+
 }

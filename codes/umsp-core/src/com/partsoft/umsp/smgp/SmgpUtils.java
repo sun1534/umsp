@@ -9,8 +9,11 @@ import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.springframework.util.StringUtils;
+
 import com.partsoft.umsp.Client;
 import com.partsoft.umsp.Constants.SMS;
+import com.partsoft.umsp.Context;
 import com.partsoft.umsp.Request;
 import com.partsoft.umsp.Response;
 import com.partsoft.umsp.handler.PacketContextHandler;
@@ -26,6 +29,12 @@ import com.partsoft.utils.RandomUtils;
 
 public abstract class SmgpUtils {
 	
+	public static final String ARG_SUBMIT_PERSECOND_MAX = "smgp.submit.persecond.max";
+	
+	public static final String ARG_DELIVER_PERSECOND_MAX = "smgp.deliver.persecond.max"; 
+	
+	public static final String ARG_CONTEXT_SEQUENCE = "smgp.context.sequence";
+
 	/**
 	 * 流量控制最后计数
 	 */
@@ -40,6 +49,17 @@ public abstract class SmgpUtils {
 	 * 服务号码
 	 */
 	public static final String ARG_SERVICE_NUMBER = "smgp.service.number";
+	
+	/**
+	 * 接收流量控制最后记录时间
+	 */
+	public static final String ARG_RECV_FLOW_LASTTIME = "smgp.flow.lasttime.recv";
+	
+	/**
+	 * 接收流量控制最后计数
+	 */
+	public static final String ARG_RECV_FLOW_TOTAL = "smgp.flow.total.recv";
+		
 
 	/**
 	 * 服务签名
@@ -92,6 +112,11 @@ public abstract class SmgpUtils {
 	 * @brief 已测试次数
 	 */
 	public static final String ARG_ACTIVE_TESTS = "smgp.active.tests";
+	
+	/**
+	 * 请求连接数统计前缀
+	 */
+	public static final String ARG_REQUEST_CONNS = "smgp.conns.";
 
 	/**
 	 * 协议版本
@@ -174,7 +199,7 @@ public abstract class SmgpUtils {
 	}
 
 	/**
-	 * 短连接发送（不重试，出错直接返回）
+	 * 短连接发送(不重试，出错直接返回)
 	 * 
 	 * @param smgp_smg_host
 	 * @param port
@@ -191,7 +216,7 @@ public abstract class SmgpUtils {
 	}
 
 	/**
-	 * 短连接发送（不重试，出错直接返回）
+	 * 短连接发送(不重试，出错直接返回)
 	 * 
 	 * @param smgp_smg_host
 	 * @param port
@@ -439,9 +464,8 @@ public abstract class SmgpUtils {
 	 * @param request
 	 * @return
 	 */
-	@SuppressWarnings("unchecked")
-	public static List<Submit> extractRequestSubmitteds(Request request) {
-		List<Submit> result = (List<Submit>) request.getAttribute(ARG_SUBMITTED_LIST);
+	public static List<?> extractRequestSubmitteds(Request request) {
+		List<?> result = (List<?>) request.getAttribute(ARG_SUBMITTED_LIST);
 		result = result == null ? Collections.EMPTY_LIST : result;
 		return result;
 	}
@@ -465,8 +489,8 @@ public abstract class SmgpUtils {
 	 * @param total
 	 *            总数
 	 */
-	public static void updateSubmitteds(Request request, List<Submit> list, int total) {
-		List<Submit> posts = extractRequestSubmitteds(request);
+	public static void updateSubmitteds(Request request, List<?> list, int total) {
+		List<?> posts = extractRequestSubmitteds(request);
 		if (posts != list) {
 			request.setAttribute(ARG_SUBMITTED_LIST, list);
 		}
@@ -623,5 +647,123 @@ public abstract class SmgpUtils {
 			request.removeAttribute(ARG_REQUEST_BINDING);
 		}
 	}			
+	
+	public static int extractRequestConnectionTotal(Request request, String serviceNumber) {
+		String arg_params;
+		Integer conns_total = 0;
+		if (!StringUtils.hasText(serviceNumber)) {
+			arg_params = ARG_REQUEST_CONNS + "0000";
+		} else { 
+			arg_params = ARG_REQUEST_CONNS + serviceNumber;
+		}
+		Context context = request.getContext();
+		synchronized (context) {
+			conns_total = (Integer) context.getAttribute(arg_params);
+		}
+		return conns_total == null ? 0 : conns_total.intValue();
+	}	
+	public static void stepIncreaseRequestConnection(Request request, String serviceNumber) {
+		String arg_params;
+		Integer conns_total = 0;
+		if (!StringUtils.hasText(serviceNumber)) {
+			arg_params = ARG_REQUEST_CONNS + "0000";
+		} else { 
+			arg_params = ARG_REQUEST_CONNS + serviceNumber;
+		}
+		Context context = request.getContext();
+		synchronized (context) {
+			conns_total = (Integer) context.getAttribute(arg_params);
+			conns_total = conns_total == null ? 0 : conns_total;
+			if (conns_total < 0) { 
+				conns_total = 0;
+			}
+			conns_total = conns_total + 1;
+			context.setAttribute(arg_params, conns_total);
+		}
+	}
+	
+	
+	public static void stepDecrementRequestConnection(Request request, String serviceNumber) {
+		String arg_params;
+		Integer conns_total = 0;
+		if (!StringUtils.hasText(serviceNumber)) {
+			arg_params = ARG_REQUEST_CONNS + "0000";
+		} else { 
+			arg_params = ARG_REQUEST_CONNS + serviceNumber;
+		}
+		Context context = request.getContext();
+		synchronized (context) {
+			conns_total = (Integer) context.getAttribute(arg_params);
+			conns_total = conns_total == null ? 0 : conns_total - 1;
+			if (conns_total <= 0) { 
+				context.removeAttribute(arg_params);
+			} else {
+				context.setAttribute(arg_params, conns_total);
+			}
+		}
+	}
+	
+	public static void setupRequestMaxSubmitPerSecond(Request request, int max) {
+		if (max > 0) {
+			request.setAttribute(ARG_SUBMIT_PERSECOND_MAX, max);
+		} else {
+			request.removeAttribute(ARG_SUBMIT_PERSECOND_MAX);
+		}
+	}
 
+	public static void setupRequestMaxDeliverPerSecond(Request request, int max) {
+		if (max > 0) {
+			request.setAttribute(ARG_DELIVER_PERSECOND_MAX, max);
+		} else {
+			request.removeAttribute(ARG_DELIVER_PERSECOND_MAX);
+		}
+	}
+	
+	public static int extractRequestMaxDeliverPerSecond(Request request) {
+		Integer result = (Integer) request.getAttribute(ARG_DELIVER_PERSECOND_MAX);
+		return result == null ? 0 : result.intValue();
+	}
+	
+	/**
+	 * 产生SEQ
+	 * 
+	 * @return
+	 */
+	public static int generateContextSequence(Context context) {
+		int result = 1;
+		synchronized (context) {
+			Integer seq = (Integer) context.getAttribute(ARG_CONTEXT_SEQUENCE);
+			if (seq == null) {
+				seq = 0;
+			}
+			seq = seq + 1;
+			if (seq >= 0xFFFF) {
+				seq = 1;
+			}
+			result = seq;
+			context.setAttribute(ARG_CONTEXT_SEQUENCE, seq);
+		}
+		return result;
+	}
+	
+	public static int extractRequestMaxSubmitPerSecond(Request request) {
+		Integer result = (Integer) request.getAttribute(ARG_SUBMIT_PERSECOND_MAX);
+		return result == null ? 0 : result.intValue();
+	}
+	
+	public static long extractRequestReceiveFlowLastTime(Request request) {
+		Long result = (Long) request.getAttribute(ARG_RECV_FLOW_LASTTIME);
+		return result == null ? System.currentTimeMillis() : result;
+	}
+
+	public static int extractRequestReceiveFlowTotal(Request request) {
+		Integer result = (Integer) request.getAttribute(ARG_RECV_FLOW_TOTAL);
+		return result == null ? 0 : result;
+	}
+
+	
+	public static void updateRequestReceiveFlowTotal(Request request, long flowLastTime, int count) {
+		request.setAttribute(ARG_RECV_FLOW_TOTAL, count);
+		request.setAttribute(ARG_RECV_FLOW_LASTTIME, flowLastTime);
+	}
 }

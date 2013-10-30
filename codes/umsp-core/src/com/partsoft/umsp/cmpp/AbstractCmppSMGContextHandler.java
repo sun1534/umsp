@@ -38,17 +38,17 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 	 * @brief 一次最多发送16条
 	 */
 	protected int _maxOnceDelivers = 10;
-	
+
 	/**
 	 * 最大每秒提交数(默认50条)
 	 */
 	protected int maxSubmitPerSecond = 50;
-	
+
 	/**
-	 * 客户转发最大每秒100条（默认）
+	 * 客户转发最大每秒100条(默认)
 	 */
-	protected int maxDeliverPerSecond = 100;	
-	
+	protected int maxDeliverPerSecond = 100;
+
 	/**
 	 * 发生错误时是否返回队列
 	 */
@@ -82,7 +82,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 			this.transmitListener = ListUtils.add(this.transmitListener, listener);
 		}
 	}
-	
+
 	public void setPhoneNumberValidator(PhoneNumberValidator phoneNumberValidator) {
 		this.phoneNumberValidator = phoneNumberValidator;
 	}
@@ -106,7 +106,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 	public void setMaxOnceDelivers(int maxOnceSubmits) {
 		this._maxOnceDelivers = maxOnceSubmits;
 	}
-	
+
 	public void setMaxSubmitPerSecond(int maxSubmitPerSecond) {
 		this.maxSubmitPerSecond = maxSubmitPerSecond;
 	}
@@ -136,7 +136,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 		String requestServiceSign = null;
 		int requestMaxSubmitsPerSecond = this.maxSubmitPerSecond;
 		int requestMaxDeliversPerSecond = this.maxDeliverPerSecond;
-		
+
 		Connect bind = (Connect) CmppUtils.extractRequestPacket(request);
 		ConnectResponse resp = (ConnectResponse) context_cmpp_packet_maps.get(Commands.CMPP_CONNECT_RESP).clone();
 		resp.sequenceId = bind.sequenceId;
@@ -154,8 +154,15 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 				requestServiceNumber = resolveRequestServiceNumber(bind.enterpriseId);
 				requestServiceSign = resolveRequestSignature(bind.enterpriseId);
 				requestMaxSubmitsPerSecond = resolveRequestMaxSubmitsPerSecond(bind.enterpriseId);
-				requestMaxDeliversPerSecond = resolveRequestMaxDeliversPerSecond(bind.enterpriseId);
+				if (requestMaxSubmitsPerSecond < 10) {
+					requestMaxSubmitsPerSecond = this.maxSubmitPerSecond;
+				}
 				
+				requestMaxDeliversPerSecond = resolveRequestMaxDeliversPerSecond(bind.enterpriseId);
+				if (requestMaxDeliversPerSecond < 10) {
+					requestMaxDeliversPerSecond = this.maxDeliverPerSecond;
+				}
+
 				if (StringUtils.hasText(requestServiceNumber)) {
 					synchronized (request.getContext()) {
 						int request_connected = CmppUtils.extractRequestConnectionTotal(request, requestServiceNumber);
@@ -166,9 +173,6 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 							if (request_connected >= max_connects) {
 								resp.status = 6;
 							}
-						}
-						if (resp.status == 0) {
-							CmppUtils.stepIncreaseRequestConnection(request, requestServiceNumber);
 						}
 					}
 				} else {
@@ -181,6 +185,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 		}
 		CmppUtils.renderDataPacket(request, response, resp);
 		if (resp.status == 0) {
+			CmppUtils.stepIncreaseRequestConnection(request, requestServiceNumber);
 			CmppUtils.setupRequestBinded(request, true);
 			CmppUtils.setupRequestServiceNumber(request, requestServiceNumber);
 			CmppUtils.setupRequestServiceSignature(request, requestServiceSign);
@@ -188,6 +193,12 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 			CmppUtils.setupRequestMaxDeliverPerSecond(request, requestMaxDeliversPerSecond);
 			response.flushBuffer();
 			afterSuccessClientConnected(request, response);
+
+			int wellbeTakeCount = 0;
+			if ((wellbeTakeCount = testQueuedDelivers(requestServiceNumber)) > 0) {
+				doPostDeliver(request, response, wellbeTakeCount);
+			}
+
 		} else {
 			response.finalBuffer();
 		}
@@ -203,9 +214,9 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 	protected abstract int resolveRequestMaxConnections(String enterpriseId);
 
 	protected abstract String resolveRequestSignature(String enterpriseId);
-	
+
 	protected abstract int resolveRequestMaxSubmitsPerSecond(String enterpriseId);
-	
+
 	protected abstract int resolveRequestMaxDeliversPerSecond(String enterpriseId);
 
 	/**
@@ -221,15 +232,15 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 	 * 
 	 * @return
 	 */
-	protected abstract List<Deliver> takeQueuedDelivers(String serviceNumber);
+	protected abstract List<Deliver> takeQueuedDelivers(String serviceNumber, int wellbeTakeCount);
 
 	/**
 	 * 判断是否有排队的数据
 	 * 
 	 * @return
 	 */
-	protected abstract boolean testQueuedDelivers(String serviceNumber);
-	
+	protected abstract int testQueuedDelivers(String serviceNumber);
+
 	public void setErrorReturnQueue(boolean errorReturnQueue) {
 		this.errorReturnQueue = errorReturnQueue;
 	}
@@ -242,58 +253,75 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 		int request_activetest_count = CmppUtils.extractRequestActiveTestCount(request);
 		String serviceNumber = CmppUtils.extractRequestServiceNumber(request);
 		boolean throw_packet_timeout = false;
-		
+		int wellbeTakeCount = 0;
 		if (CmppUtils.testRequestBinded(request) && request_activetest_count < getMaxActiveTestCount()) {
 			if (request_idle_time >= (this._activeTestIntervalTime * (request_activetest_count + 1))) {
 				doActiveTestRequest(request, response);
-			} else if (request_activetest_count <= 0 && !request_submiting && testQueuedDelivers(serviceNumber)) {
-				doPostDeliver(request, response);
+			} else if (request_activetest_count <= 0 && !request_submiting
+					&& ((wellbeTakeCount = testQueuedDelivers(serviceNumber)) > 0)) {
+				doPostDeliver(request, response, wellbeTakeCount);
 			}
 		} else if (CmppUtils.testRequestBinding(request)) {
 			throw_packet_timeout = request_idle_time >= this._activeTestIntervalTime;
 		} else {
 			throw_packet_timeout = true;
 		}
-		
-		if(throw_packet_timeout) {
+
+		if (throw_packet_timeout) {
 			if (request_submiting) {
 				int submitted_result_count = CmppUtils.extractRequestSubmittedRepliedCount(request);
 				int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
-				
-				List<Deliver> submitted_list = (List<Deliver>) CmppUtils.extractRequestSubmitteds(request);
-				List<Deliver> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
-				if (this.errorReturnQueue) {
-					Log.warn("For a long time not receive reply, return submit to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
-					this.returnQueuedDelivers(serviceNumber, unresult_list);
-				} else {
-					Log.warn("For a long time not receive a reply, ignored submits, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
-				}
-				CmppUtils.cleanRequestSubmitteds(request);
-				int transmit_listener_size = ListUtils.size(transmitListener);
-				if (transmit_listener_size > 0 && unresult_list.size() > 0) {
-					for (int ii = 0; ii < unresult_list.size(); ii++) {
-						TransmitEvent event = new TransmitEvent(unresult_list.get(ii));
-						for (int i = 0; i < transmit_listener_size; i++) {
-							TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
-							try {
-								listener.transmitTimeout(event);
-							} catch (Exception e) {
-								Log.error("ignored submit transmit timeout error: " + e.getMessage(), e);
+
+				if (submitted_count > 0 && submitted_result_count < submitted_count) {
+					List<Deliver> submitted_list = (List<Deliver>) CmppUtils.extractRequestSubmitteds(request);
+					List<Deliver> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
+					if (this.errorReturnQueue) {
+						Log.warn(String
+								.format("长时间未收到上行短信提交应答, 把已提交短信返回待发送队列(%d/%d)", submitted_count, submitted_count));
+						returnQueuedDelivers(serviceNumber, unresult_list);
+					} else {
+						Log.warn(String.format("长时间未收到上行短信提交应答，忽略返回待发队列(%d/%d)", submitted_count, submitted_count));
+					}
+					int transmit_listener_size = ListUtils.size(transmitListener);
+					if (transmit_listener_size > 0 && unresult_list.size() > 0) {
+						for (int ii = 0; ii < unresult_list.size(); ii++) {
+							TransmitEvent event = null;
+							if (this.errorReturnQueue) {
+								event = new TransmitEvent(unresult_list.get(ii));
+							} else {
+								Deliver submittedDeliver = unresult_list.get(ii);
+								DeliverResponse res = (DeliverResponse) this.context_cmpp_packet_maps.get(
+										Commands.CMPP_DELIVER_RESP).clone();
+								res.result = 1;
+								event = new TransmitEvent(new Object[] { submittedDeliver, res });
+							}
+							for (int i = 0; i < transmit_listener_size; i++) {
+								TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
+								try {
+									if (this.errorReturnQueue) {
+										listener.transmitTimeout(event);
+									} else {
+										listener.endTransmit(event);
+									}
+								} catch (Exception e) {
+									Log.warn(String.format("忽略应答超时后处理错误(%s)", e.getMessage()), e);
+								}
 							}
 						}
 					}
 				}
 			}
-			throw new PacketException(String.format(request_activetest_count + " times active test, but not reply"));
+			CmppUtils.cleanRequestSubmitteds(request);
+			throw new PacketException(String.format("%d次存活测试未收到应答", request_activetest_count));
 		}
-		
+
 	}
-	
-	protected void doPostDeliver(Request request, Response response) throws IOException {
-		
+
+	protected void doPostDeliver(Request request, Response response, int wellbeTakeCount) throws IOException {
+
 		int currentMaxDeliverPerSecond = CmppUtils.extractRequestMaxDeliverPerSecond(request);
-		
-		//TODO 需要实现从客户配置信息中获取流量控制数目
+
+		// TODO 需要实现从客户配置信息中获取流量控制数目
 		// 上次流量统计的开始时间
 		long flowLastTime = CmppUtils.extractRequestFlowLastTime(request);
 		// 上次统计以来流量总数
@@ -311,25 +339,29 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 			flowLastTime = currentTimeMilles;
 			flowTotal = 0;
 		}
-		
+
 		Integer submitted = Integer.valueOf(0);
 		String serviceNumber = CmppUtils.extractRequestServiceNumber(request);
 		List<Deliver> takedPostSubmits = null;
 		try {
-			takedPostSubmits = takeQueuedDelivers(serviceNumber);
+			takedPostSubmits = takeQueuedDelivers(serviceNumber, wellbeTakeCount);
 		} catch (Throwable e) {
-			Log.error("take delivers from queue error: " + e.getMessage(), e);
+			Log.warn("从待发上行队列中获取短信失败: " + e.getMessage(), e);
 		}
 		if (takedPostSubmits != null) {
 			for (Deliver sb : takedPostSubmits) {
 				sb.protocolVersion = this.protocolVersion;
-				
+
 				sb.nodeId = this.gatewayId;
 				sb.nodeTime = CalendarUtils.nowTimestampInYearDuring();
 				sb.nodeSeq = CmppUtils.generateContextSequence(request.getContext());
-				
+				if (sb.submitCount >= this.packetSubmitRetryTimes) {
+					Log.warn(String.format("忽略已转发%d次来自用户(%s)的%s:\n%s\n", sb.submitCount, sb.getSourceIdTrimCNPrefix(),
+							sb.registeredDelivery == (byte) 1 ? "状态报告" : "上行短信", sb.toString()));
+					continue;
+				}
 				sb.sequenceId = CmppUtils.generateRequestSequence(request);
-				
+
 				int transmit_listener_size = ListUtils.size(transmitListener);
 				if (transmit_listener_size > 0) {
 					TransmitEvent event = new TransmitEvent(sb);
@@ -338,7 +370,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 						try {
 							evnListener.beginTransmit(event);
 						} catch (Throwable e) {
-							Log.error("ignored deliver begin transmit error: " + e.getMessage(), e);
+							Log.warn(String.format("被忽略的上行短信提交前处理错误(%s)", e.getMessage()), e);
 						}
 					}
 				}
@@ -352,7 +384,27 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 					if (this.errorReturnQueue) {
 						returnQueuedDelivers(serviceNumber, takedPostSubmits);
 					} else {
-						returnQueuedDelivers(serviceNumber, takedPostSubmits.subList(submitted, takedPostSubmits.size()));
+						returnQueuedDelivers(serviceNumber,
+								takedPostSubmits.subList(submitted, takedPostSubmits.size()));
+						for (int ei = 0; ei < submitted; ei++) {
+							transmit_listener_size = ListUtils.size(transmitListener);
+							if (transmit_listener_size > 0) {
+								Deliver ignSubmitted = takedPostSubmits.get(ei);
+								DeliverResponse res = (DeliverResponse) this.context_cmpp_packet_maps.get(
+										Commands.CMPP_DELIVER_RESP).clone();
+								res.result = 1;
+								TransmitEvent event = new TransmitEvent(new Object[] { ignSubmitted, res });
+								for (int j = 0; j < transmit_listener_size; j++) {
+									TransmitListener evnListener = (TransmitListener) ListUtils
+											.get(transmitListener, j);
+									try {
+										evnListener.endTransmit(event);
+									} catch (Throwable ee) {
+										Log.warn(String.format("上行短信提交出错后被忽略的提交后处理错误(%s)", e.getMessage()), ee);
+									}
+								}
+							}
+						}
 					}
 					CmppUtils.cleanRequestSubmitteds(request);
 					throw e;
@@ -366,49 +418,31 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 						try {
 							evnListener.transmitted(event);
 						} catch (Throwable e) {
-							Log.error("ignored deliver transmitted error: " + e.getMessage(), e);
+							Log.warn(String.format("被忽略的上行短信提交后处理错误(%s)", e.getMessage()), e);
 						}
 					}
 				}
 			}
 		}
 	}
-	
+
 	@Override
 	protected void doActiveTestResponse(Request request, Response response) throws IOException {
 		super.doActiveTestResponse(request, response);
-		//TODO 临时日志
-		//Log.warn("发送至客户端的链路侦测包已应答");
 		String serviceNumber = CmppUtils.extractRequestServiceNumber(request);
-		if (!CmppUtils.testRequestSubmiting(request) && testQueuedDelivers(serviceNumber)) {
-			doPostDeliver(request, response);
+		int wellbeTakeCount = 0;
+		if (!CmppUtils.testRequestSubmiting(request) && ((wellbeTakeCount = testQueuedDelivers(serviceNumber)) > 0)) {
+			doPostDeliver(request, response, wellbeTakeCount);
 		}
 	}
 
-	//@SuppressWarnings("unchecked")
 	@Override
 	protected void doActiveTest(Request request, Response response) throws IOException {
 		super.doActiveTest(request, response);
-		//TODO 临时日志
-		//Log.warn("收到来自客户端的链路侦测包");
-		
 		String serviceNumber = CmppUtils.extractRequestServiceNumber(request);
-		/**
-		if (CmppUtils.testRequestSubmiting(request)) {
-			int submitted_result_count = CmppUtils.extractRequestSubmittedRepliedCount(request);
-			int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
-			Log.warn("Submit not reply but active test receive, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
-			
-			List<Deliver> submitted_list = (List<Deliver>) CmppUtils.extractRequestSubmitteds(request);
-			returnQueuedDelivers(serviceNumber, submitted_list.subList(submitted_result_count, submitted_count));
-			CmppUtils.cleanRequestSubmitteds(request);
-		} else if (testQueuedDelivers(serviceNumber)) {
-			doPostDeliver(request, response);
-		}
-		*/
-		
-		if (!CmppUtils.testRequestSubmiting(request) && testQueuedDelivers(serviceNumber)) {
-			doPostDeliver(request, response);
+		int wellbeTakeCount = 0;
+		if (!CmppUtils.testRequestSubmiting(request) && ((wellbeTakeCount = testQueuedDelivers(serviceNumber)) > 0)) {
+			doPostDeliver(request, response, wellbeTakeCount);
 		}
 	}
 
@@ -432,7 +466,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 					try {
 						evnListener.endTransmit(event);
 					} catch (Throwable e) {
-						Log.error("ignored deliver end transmit error: " + e.getMessage(), e);
+						Log.warn(String.format("被忽略的上行短信提交SP端应答后处理错误(%s)", e.getMessage()), e);
 					}
 				}
 			}
@@ -440,12 +474,13 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 					.extractRequestSubmittedCount(request)) {
 				returnQueuedDelivers(serviceNumber, null);
 				CmppUtils.cleanRequestSubmitteds(request);
-				if (testQueuedDelivers(serviceNumber)) {
-					this.doPostDeliver(request, response);
+				int wellbeTakeCount = 0;
+				if ((wellbeTakeCount = testQueuedDelivers(serviceNumber)) > 0) {
+					this.doPostDeliver(request, response, wellbeTakeCount);
 				}
 			}
 		} else {
-			Log.warn("not found deliver submitted, but receive deliver reply???");
+			Log.warn("未提交上行短信，却收到提交应答指令???");
 		}
 	}
 
@@ -462,7 +497,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 				}
 			}
 		} else {
-			Log.warn("not found phone number validator");
+			Log.warn("未发现号码校验器实现");
 			for (int i = 0; i < submit.destUserCount; i++) {
 				if (!submit.destTerminalIds[i].matches("\\d+")) {
 					return false;
@@ -496,21 +531,21 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 	protected void doSubmit(Request request, Response response) throws IOException {
 		super.doSubmit(request, response);
 		String serviceNumber = CmppUtils.extractRequestServiceNumber(request);
-		
-		//获取当前请求的最大发送没秒发送数
+
+		// 获取当前请求的最大发送没秒发送数
 		int currentMaxSubmitPerSecond = CmppUtils.extractRequestMaxSubmitPerSecond(request);
-		
-		//TODO 需要实现从客户配置信息中获取流量控制数目
+
+		// TODO 需要实现从客户配置信息中获取流量控制数目
 		// 上次流量统计的开始时间
 		long flowLastTime = CmppUtils.extractRequestReceiveFlowLastTime(request);
 		// 上次统计以来流量总数
 		int flowTotal = CmppUtils.extractRequestReceiveFlowTotal(request);
-		
+
 		// 当前时间
 		long currentTimeMilles = System.currentTimeMillis();
-		
+
 		boolean isMaxReceiveFlowLimited = false;
-		//是否超限
+		// 是否超限
 		// 如果间隔小于1秒和发送总数大于
 		if ((currentTimeMilles - flowLastTime) < 1000 && flowTotal > currentMaxSubmitPerSecond) {
 			isMaxReceiveFlowLimited = true;
@@ -518,25 +553,22 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 			flowLastTime = currentTimeMilles;
 			flowTotal = 0;
 		}
-		
+
 		Submit submit = (Submit) CmppUtils.extractRequestPacket(request);
-		//大爷的， 就少这么一个clone...并发上去以后，发现回复好多重复SEQ。。。。
-		// 百思不得其解。。。。。两天时间查了整个代码才发现！！！
-		// 细节是魔鬼啊。童鞋们注意了。。。
 		SubmitResponse resp = (SubmitResponse) this.context_cmpp_packet_maps.get(Commands.CMPP_SUBMIT_RESP).clone();
 		resp.protocolVersion = this.protocolVersion;
 		resp.sequenceId = submit.sequenceId;
-		
+
 		resp.nodeId = this.gatewayId;
 		resp.nodeTime = CalendarUtils.getTimestampInYearDuring(submit.createTimeMillis);
 		resp.nodeSeq = CmppUtils.generateContextSequence(request.getContext());
 		resp.result = 9;
-		
+
 		flowTotal++;
 		CmppUtils.updateRequestReceiveFlowTotal(request, flowLastTime, flowTotal);
-		
+
 		if (isMaxReceiveFlowLimited) {
-			resp.result = -1; //流量超限
+			resp.result = -1; // 流量超限
 		} else if (!StringUtils.hasText(submit.sourceId) || !submit.sourceId.startsWith(serviceNumber)) {
 			resp.result = 1;
 		} else {
@@ -546,7 +578,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 			try {
 				submit_valid = testClientSubmitValid(submit, signLen);
 			} catch (Throwable e) {
-				Log.warn(String.format("testClientSubmitValid error:" + e.getMessage()), e);
+				Log.warn(String.format("测试发送提交包(%s)是否有效时出错: %s", submit.toString(), e.getMessage()), e);
 				submit_valid = false;
 			}
 
@@ -570,7 +602,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 					submit.nodeSeq = resp.nodeSeq;
 					submit.sequenceId = resp.sequenceId;
 					// 分发客户端提交上来的发送请求
-					dispatchSubmit(submit);
+					dispatchSubmit(submit, resp);
 					resp.result = 0;
 				} catch (Throwable e) {
 					Log.warn(e.getMessage(), e);
@@ -580,9 +612,16 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 			}
 		}
 		CmppUtils.renderDataPacket(request, response, resp);
+
+		// 20130423添加
+		int wellbeTakeCount = 0;
+		if (!CmppUtils.testRequestSubmiting(request) && ((wellbeTakeCount = testQueuedDelivers(serviceNumber)) > 0)) {
+			doPostDeliver(request, response, wellbeTakeCount);
+		}
+
 	}
 
-	protected abstract void dispatchSubmit(Submit submit);
+	protected abstract void dispatchSubmit(Submit submit, SubmitResponse submit_response);
 
 	@Override
 	protected void doDeliverResponse(Request request, Response response) throws IOException {
@@ -593,18 +632,49 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 	@SuppressWarnings("unchecked")
 	@Override
 	protected void handleDisConnect(Request request, Response response) {
-		if (CmppUtils.testRequestBinded(request)){
+		if (CmppUtils.testRequestBinded(request)) {
 			String serviceNumber = CmppUtils.extractRequestServiceNumber(request);
 			CmppUtils.stepDecrementRequestConnection(request, serviceNumber);
 			if (CmppUtils.testRequestSubmiting(request)) {
 				int submitted_result_count = CmppUtils.extractRequestSubmittedRepliedCount(request);
 				int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
-				if (this.errorReturnQueue) {
-					Log.warn("return submitted to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_result_count);
+				if (submitted_count > 0 && submitted_result_count < submitted_count) {
 					List<Deliver> submitted_list = (List<Deliver>) CmppUtils.extractRequestSubmitteds(request);
-					this.returnQueuedDelivers(serviceNumber, submitted_list.subList(submitted_result_count, submitted_count));
-				} else {
-					Log.warn("ignore submits, submit-count=" + submitted_count + ", reply-count=" + submitted_result_count);
+					List<Deliver> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
+					if (this.errorReturnQueue) {
+						Log.warn(String
+								.format("连接断开，返回已提交未应答上行短信至待发队列(%d/%d)", submitted_result_count, submitted_count));
+						this.returnQueuedDelivers(serviceNumber, unresult_list);
+					} else {
+						Log.warn(String.format("连接断开，忽略已提交未应答短信(%d/%d)", submitted_result_count, submitted_count));
+						int transmit_listener_size = ListUtils.size(transmitListener);
+						if (transmit_listener_size > 0 && unresult_list.size() > 0) {
+							for (int ii = 0; ii < unresult_list.size(); ii++) {
+								TransmitEvent event = null;
+								if (this.errorReturnQueue) {
+									event = new TransmitEvent(unresult_list.get(ii));
+								} else {
+									Deliver submitted = unresult_list.get(ii);
+									DeliverResponse res = (DeliverResponse) context_cmpp_packet_maps.get(
+											Commands.CMPP_DELIVER_RESP).clone();
+									res.result = 1;
+									event = new TransmitEvent(new Object[] { submitted, res });
+								}
+								for (int i = 0; i < transmit_listener_size; i++) {
+									TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
+									try {
+										if (this.errorReturnQueue) {
+											listener.transmitTimeout(event);
+										} else {
+											listener.endTransmit(event);
+										}
+									} catch (Exception e) {
+										Log.warn(String.format("忽略上行短信应答断开后处理错误(%s)", e.getMessage()), e);
+									}
+								}
+							}
+						}
+					}
 				}
 				CmppUtils.cleanRequestSubmitteds(request);
 			}

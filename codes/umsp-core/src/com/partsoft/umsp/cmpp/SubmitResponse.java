@@ -9,11 +9,11 @@ import com.partsoft.umsp.cmpp.Constants.Commands;
 public class SubmitResponse extends CmppDataPacket {
 
 	private static final long serialVersionUID = 0x80000004L;
-	
+
 	public int nodeId;
-	
+
 	public int nodeTime;
-	
+
 	public int nodeSeq;
 
 	public int result;
@@ -21,7 +21,7 @@ public class SubmitResponse extends CmppDataPacket {
 	public SubmitResponse() {
 		super(Commands.CMPP_SUBMIT_RESP);
 	}
-	
+
 	public long getMsgId() {
 		return CmppUtils.generateMsgID(this.nodeId, this.nodeTime, this.nodeSeq);
 	}
@@ -41,11 +41,11 @@ public class SubmitResponse extends CmppDataPacket {
 	protected void readDataInput(DataInput in) throws IOException {
 		super.readDataInput(in);
 		long temp_msgid = in.readLong();
-		
+
 		nodeId = CmppUtils.extractNodeIdFromMsgID(temp_msgid);
 		nodeTime = CmppUtils.extractNodeTimeFromMsgID(temp_msgid);
 		nodeSeq = CmppUtils.extractNodeSeqFromMsgID(temp_msgid);
-		
+
 		if (protocolVersion == Constants.VERSION3) {
 			this.result = in.readInt();
 		} else {
@@ -71,9 +71,8 @@ public class SubmitResponse extends CmppDataPacket {
 
 	@Override
 	public String toString() {
-		return "SubmitResponse [nodeId=" + nodeId + ", nodeTime=" + nodeTime
-				+ ", nodeSeq=" + nodeSeq + ", result=" + result + ", sequenceId=" + sequenceId + ", createTimeMillis="
-				+ createTimeMillis + ", protocolVersion=" + protocolVersion + "]";
+		return "移动CMPP提交应答包 [节点号=" + nodeId + ", 节点时间=" + nodeTime + ", 节点序号=" + nodeSeq + ", 应答状态=" + result + ", 序号="
+				+ sequenceId + ", 创建时间=" + createTimeMillis + ", 版本协议=" + protocolVersion + "]";
 	}
-	
+
 }

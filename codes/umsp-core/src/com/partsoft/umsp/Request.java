@@ -95,7 +95,7 @@ public interface Request {
 	String getRemoteAddr();
 
 	/**
-	 * 获取客户主机名（可用的话）
+	 * 获取客户主机名(可用的话)
 	 * 
 	 * @return
 	 */
@@ -109,7 +109,7 @@ public interface Request {
 	int getRemotePort();
 
 	/**
-	 * 获取本地主机名（如果可用的话）
+	 * 获取本地主机名(如果可用的话)
 	 * 
 	 * @return
 	 */

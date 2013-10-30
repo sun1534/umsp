@@ -14,7 +14,7 @@ public final class Client extends AbstractOriginHandler implements Attributes, O
 	protected boolean _autoReConnect = false;
 
 	/**
-	 * @brief 重连间隔时间，单位：毫秒，默认值（30秒）
+	 * @brief 重连间隔时间，单位：毫秒，默认值(30秒)
 	 */
 	protected long _reConnectIntervalTime = 30000;
 
@@ -32,6 +32,10 @@ public final class Client extends AbstractOriginHandler implements Attributes, O
 	 * @brief 最大连接发起数
 	 */
 	protected int _maxConnection = 1;
+	
+	private boolean _ignoredEofException = true;
+
+	private boolean _ignoredConnectionException = false;
 
 	protected String _host;
 
@@ -41,6 +45,14 @@ public final class Client extends AbstractOriginHandler implements Attributes, O
 
 	public Client() {
 		setOrigin(this);
+	}
+	
+	public void setIgnoredConnectionException(boolean _ignoredConnectionException) {
+		this._ignoredConnectionException = _ignoredConnectionException;
+	}
+	
+	public void setIgnoredEofException(boolean _ignoredEofException) {
+		this._ignoredEofException = _ignoredEofException;
 	}
 
 	public Client(String host, int port) {
@@ -99,7 +111,7 @@ public final class Client extends AbstractOriginHandler implements Attributes, O
 	}
 
 	/**
-	 * @brief 重连间隔时间，单位：毫秒，默认值（3秒）
+	 * @brief 重连间隔时间，单位：毫秒，默认值(3秒)
 	 * @return
 	 */
 	public long getReConnectIntervalTime() {
@@ -155,6 +167,10 @@ public final class Client extends AbstractOriginHandler implements Attributes, O
 					if (getMaxIdleTime() != packet_connector.getLowResourceMaxIdleTime()) {
 						packet_connector.setLowResourceMaxIdleTime(getMaxIdleTime());
 					}
+					
+					packet_connector.setIgnoredConnectionException(this._ignoredConnectionException);
+					packet_connector.setIgnoredEofException(this._ignoredEofException);
+					
 				}
 			}
 		}

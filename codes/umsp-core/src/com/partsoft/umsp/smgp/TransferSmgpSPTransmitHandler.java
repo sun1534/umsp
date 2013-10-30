@@ -42,13 +42,13 @@ public class TransferSmgpSPTransmitHandler extends AbstractSmgpSPTransmitHandler
 	}
 
 	@Override
-	protected List<Submit> takeQueuedSubmits() {
-		return batchPool.takeObjects(getMaxOnceSubmits());
+	protected List<Submit> takeQueuedSubmits(int count) {
+		return batchPool.takeObjects(count > getMaxOnceSubmits() ? getMaxOnceSubmits() : count);
 	}
 
 	@Override
-	protected boolean testQueuedSubmits() {
-		return batchPool.isPooling();
+	protected int testQueuedSubmits() {
+		return batchPool.countPooling(getMaxOnceSubmits());
 	}
 
 	@Override

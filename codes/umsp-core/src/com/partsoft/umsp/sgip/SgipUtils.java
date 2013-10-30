@@ -1,12 +1,16 @@
 package com.partsoft.umsp.sgip;
 
 import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.List;
+
+import org.springframework.util.StringUtils;
 
 import com.partsoft.umsp.Client;
 import com.partsoft.umsp.Context;
@@ -15,6 +19,7 @@ import com.partsoft.umsp.Constants.SMS;
 import com.partsoft.umsp.Response;
 import com.partsoft.umsp.handler.PacketContextHandler;
 import com.partsoft.umsp.handler.TransmitListener;
+import com.partsoft.umsp.io.ByteArrayBuffer;
 import com.partsoft.umsp.packet.PacketInputStream;
 import com.partsoft.umsp.packet.PacketOutputStream;
 import com.partsoft.utils.Assert;
@@ -23,11 +28,30 @@ import com.partsoft.utils.CompareUtils;
 import com.partsoft.utils.RandomUtils;
 
 public abstract class SgipUtils {
+	
+	/**
+	 * 接收流量控制最后计数
+	 */
+	public static final String ARG_RECV_FLOW_TOTAL = "sgip.flow.total.recv";
+
+	/**
+	 * 接收流量控制最后记录时间
+	 */
+	public static final String ARG_RECV_FLOW_LASTTIME = "sgip.flow.lasttime.recv";
+	
+	public static final String ARG_SUBMIT_PERSECOND_MAX = "sgip.submit.persecond.max";
+	
+	public static final String ARG_DELIVER_PERSECOND_MAX = "sgip.deliver.persecond.max"; 
 
 	/**
 	 * 流量控制最后计数
 	 */
 	public static final String ARG_FLOW_TOTAL = "sgip.flow.total";
+	
+	/**
+	 * 请求连接数统计前缀
+	 */
+	public static final String ARG_REQUEST_CONNS = "sgip.conns.";
 
 	/**
 	 * 流量控制最后记录时间
@@ -110,8 +134,9 @@ public abstract class SgipUtils {
 	 * @param node_id
 	 *            节点编号
 	 * @param mills_time
-	 *            时间（毫秒）
+	 *            时间(毫秒)
 	 */
+	@Deprecated
 	public static void stuffSerialNumber(SgipDataPacket dest, Request request, int node_id, long mills_time) {
 		dest.node_id = node_id;
 		dest.timestamp = CalendarUtils.getTimestampInYearDuring(mills_time);
@@ -262,8 +287,8 @@ public abstract class SgipUtils {
 		SimpleQueuedSgipSPSendHandler sgip_handler = new SimpleQueuedSgipSPSendHandler();
 		sgip_handler.setAccount(uid);
 		sgip_handler.setPassword(pwd);
-		sgip_handler.setSpNumber(Integer.parseInt(sp_number));
-		sgip_handler.setEnterpriseId(Integer.parseInt(enterprise_id));
+		sgip_handler.setSpNumber(sp_number);
+		sgip_handler.setEnterpriseId(enterprise_id);
 		sgip_handler.postSubmit(Arrays.asList(submits));
 		if (listener != null) {
 			sgip_handler.addTransmitListener(listener);
@@ -413,9 +438,8 @@ public abstract class SgipUtils {
 	 * @param request
 	 * @return
 	 */
-	@SuppressWarnings("unchecked")
-	public static List<Submit> extractRequestSubmitteds(Request request) {
-		List<Submit> result = (List<Submit>) request.getAttribute(ARG_SUBMITTED_LIST);
+	public static List<?> extractRequestSubmitteds(Request request) {
+		List<?> result = (List<?>) request.getAttribute(ARG_SUBMITTED_LIST);
 		result = result == null ? Collections.EMPTY_LIST : result;
 		return result;
 	}
@@ -439,8 +463,8 @@ public abstract class SgipUtils {
 	 * @param total
 	 *            总数
 	 */
-	public static void updateSubmitteds(Request request, List<Submit> list, int total) {
-		List<Submit> posts = extractRequestSubmitteds(request);
+	public static void updateSubmitteds(Request request, List<?> list, int total) {
+		List<?> posts = extractRequestSubmitteds(request);
 		if (posts != list) {
 			request.setAttribute(ARG_SUBMITTED_LIST, list);
 		}
@@ -559,4 +583,126 @@ public abstract class SgipUtils {
 			request.removeAttribute(ARG_REQUEST_BINDING);
 		}
 	}		
+	
+	public static void setupRequestMaxSubmitPerSecond(Request request, int max) {
+		if (max > 0) {
+			request.setAttribute(ARG_SUBMIT_PERSECOND_MAX, max);
+		} else {
+			request.removeAttribute(ARG_SUBMIT_PERSECOND_MAX);
+		}
+	}
+	
+	public static void stepIncreaseRequestConnection(Request request, String serviceNumber) {
+		String arg_params;
+		Integer conns_total = 0;
+		if (!StringUtils.hasText(serviceNumber)) {
+			arg_params = ARG_REQUEST_CONNS + "0000";
+		} else { 
+			arg_params = ARG_REQUEST_CONNS + serviceNumber;
+		}
+		Context context = request.getContext();
+		synchronized (context) {
+			conns_total = (Integer) context.getAttribute(arg_params);
+			conns_total = conns_total == null ? 0 : conns_total;
+			if (conns_total < 0) { 
+				conns_total = 0;
+			}
+			conns_total = conns_total + 1;
+			context.setAttribute(arg_params, conns_total);
+		}
+	}
+	
+	public static void setupRequestMaxDeliverPerSecond(Request request, int max) {
+		if (max > 0) {
+			request.setAttribute(ARG_DELIVER_PERSECOND_MAX, max);
+		} else {
+			request.removeAttribute(ARG_DELIVER_PERSECOND_MAX);
+		}
+	}
+	
+	public static int extractRequestConnectionTotal(Request request, String serviceNumber) {
+		String arg_params;
+		Integer conns_total = 0;
+		if (!StringUtils.hasText(serviceNumber)) {
+			arg_params = ARG_REQUEST_CONNS + "0000";
+		} else { 
+			arg_params = ARG_REQUEST_CONNS + serviceNumber;
+		}
+		Context context = request.getContext();
+		synchronized (context) {
+			conns_total = (Integer) context.getAttribute(arg_params);
+		}
+		return conns_total == null ? 0 : conns_total.intValue();
+	}
+	
+	public static int extractRequestMaxSubmitPerSecond(Request request) {
+		Integer result = (Integer) request.getAttribute(ARG_SUBMIT_PERSECOND_MAX);
+		return result == null ? 0 : result.intValue();
+	}
+	
+
+	public static long extractRequestReceiveFlowLastTime(Request request) {
+		Long result = (Long) request.getAttribute(ARG_RECV_FLOW_LASTTIME);
+		return result == null ? System.currentTimeMillis() : result;
+	}
+
+	public static int extractRequestReceiveFlowTotal(Request request) {
+		Integer result = (Integer) request.getAttribute(ARG_RECV_FLOW_TOTAL);
+		return result == null ? 0 : result;
+	}
+	
+	public static void updateRequestReceiveFlowTotal(Request request, long flowLastTime, int count) {
+		request.setAttribute(ARG_RECV_FLOW_TOTAL, count);
+		request.setAttribute(ARG_RECV_FLOW_LASTTIME, flowLastTime);
+	}
+
+	public static void stepDecrementRequestConnection(Request request, String serviceNumber) {
+		String arg_params;
+		Integer conns_total = 0;
+		if (!StringUtils.hasText(serviceNumber)) {
+			arg_params = ARG_REQUEST_CONNS + "0000";
+		} else { 
+			arg_params = ARG_REQUEST_CONNS + serviceNumber;
+		}
+		Context context = request.getContext();
+		synchronized (context) {
+			conns_total = (Integer) context.getAttribute(arg_params);
+			conns_total = conns_total == null ? 0 : conns_total - 1;
+			if (conns_total <= 0) { 
+				context.removeAttribute(arg_params);
+			} else {
+				context.setAttribute(arg_params, conns_total);
+			}
+		}
+	}
+
+	public static String generateClientToken(String clientid, String sharedSecret, long timestamp) {
+		MessageDigest md5_encode = null;
+		sharedSecret = sharedSecret == null ? "" : sharedSecret;
+		ByteArrayBuffer array_buffer = new ByteArrayBuffer(clientid.length() + sharedSecret.length() + 19);
+		try {
+			md5_encode = MessageDigest.getInstance("MD5");
+		} catch (NoSuchAlgorithmException e) {
+			throw new IllegalStateException("can't do md5 encode", e);
+		}
+		for (int i = 0; i < clientid.length(); i++) {
+			array_buffer.put((byte) clientid.charAt(i));
+		}
+
+		array_buffer.put(new byte[9]);
+		for (int i = 0; i < sharedSecret.length(); i++) {
+			array_buffer.put((byte) sharedSecret.charAt(i));
+		}
+		String timestamp_str = String.format("%010d", timestamp);
+		for (int i = 0; i < timestamp_str.length(); i++) {
+			array_buffer.put((byte) timestamp_str.charAt(i));
+		}
+		byte[] md5_bytes = md5_encode.digest(array_buffer.array());
+		char[] md5_chars = new char[md5_bytes.length];
+		for (int i = 0; i < md5_bytes.length; i++) {
+			md5_chars[i] = (char) md5_bytes[i];
+		}
+		return new String(md5_chars);
+	}
+
 }

@@ -40,7 +40,9 @@ public class Log {
 			if (__verbose)
 				e.printStackTrace();
 		}
-		__log.info(String.format("Logging to %s via %s", __log, log_class.getName()));
+		if (__log.isDebugEnabled()) {
+			__log.debug(String.format("Logging to %s via %s", __log, log_class.getName()));
+		}
 	}
 
 	public static void setLog(Logger log) {

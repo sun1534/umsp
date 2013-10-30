@@ -109,18 +109,18 @@ public class TransferCmppSMGHandler extends AbstractCmppSMGContextHandler {
 	}
 
 	@Override
-	protected List<Deliver> takeQueuedDelivers(String serviceNumber) {
-		return batchPool.takeObjects(getMaxOnceDelivers(), serviceNumber);
+	protected List<Deliver> takeQueuedDelivers(String serviceNumber, int count) {
+		return batchPool.takeObjects(count > getMaxOnceDelivers() ? getMaxOnceDelivers() : count, serviceNumber);
 	}
 
 	@Override
-	protected boolean testQueuedDelivers(String serviceNumber) {
-		return batchPool.isPooling(serviceNumber);
+	protected int testQueuedDelivers(String serviceNumber) {
+		return batchPool.countPooling(getMaxOnceDelivers(), serviceNumber);
 	}
 
 	@Override
-	protected void dispatchSubmit(Submit submit) {
-		RecipientEvent event = new RecipientEvent(submit);
+	protected void dispatchSubmit(Submit submit, SubmitResponse submit_response) {
+		RecipientEvent event = new RecipientEvent(submit, submit_response);
 		for (int i = 0; i < ListUtils.size(this.recipientListener); i++) {
 			RecipientListener listener = (RecipientListener) ListUtils.get(recipientListener, i);
 			listener.dataArrive(event);

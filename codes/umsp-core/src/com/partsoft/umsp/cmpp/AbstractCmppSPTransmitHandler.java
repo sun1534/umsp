@@ -12,6 +12,7 @@ import com.partsoft.umsp.handler.TransmitListener;
 import com.partsoft.umsp.log.Log;
 import com.partsoft.umsp.packet.PacketException;
 import com.partsoft.umsp.cmpp.Submit;
+import com.partsoft.umsp.cmpp.Constants.Commands;
 import com.partsoft.utils.CalendarUtils;
 import com.partsoft.utils.ListUtils;
 import com.partsoft.utils.StringUtils;
@@ -31,7 +32,7 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 	protected int _maxActiveTestCount = 3;
 
 	/**
-	 * @brief 一次最多发送16条 （默认参数）
+	 * @brief 一次最多发送16条 (默认参数)
 	 */
 	protected int _maxOnceSubmits = 10;
 
@@ -44,7 +45,7 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 	 * 发生错误时是否返回队列
 	 */
 	protected boolean errorReturnQueue = true;
-	
+
 	/**
 	 * 确认是否返回度列
 	 */
@@ -53,7 +54,7 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 
 	public AbstractCmppSPTransmitHandler() {
 	}
-	
+
 	public void setErrorReturnQueue(boolean errorReturnQueue) {
 		this.errorReturnQueue = errorReturnQueue;
 	}
@@ -115,14 +116,14 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 	 * 
 	 * @return
 	 */
-	protected abstract List<Submit> takeQueuedSubmits();
+	protected abstract List<Submit> takeQueuedSubmits(int count);
 
 	/**
 	 * 判断是否有排队的数据
 	 * 
 	 * @return
 	 */
-	protected abstract boolean testQueuedSubmits();
+	protected abstract int testQueuedSubmits();
 
 	/**
 	 * 接收消息
@@ -145,12 +146,14 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 		boolean request_submiting = CmppUtils.testRequestSubmiting(request);
 		int request_activetest_count = CmppUtils.extractRequestActiveTestCount(request);
 		boolean throw_packet_timeout = false;
-		
+		int wellbeTakeCount = 0;
+
 		if (CmppUtils.testRequestBinded(request) && request_activetest_count < getMaxActiveTestCount()) {
 			if (request_idle_time >= this._activeTestIntervalTime * (request_activetest_count + 1)) {
 				doActiveTestRequest(request, response);
-			} else if (request_activetest_count <= 0 && !request_submiting && testQueuedSubmits()) {
-				doPostSubmit(request, response);
+			} else if (request_activetest_count <= 0 && !request_submiting
+					&& ((wellbeTakeCount = testQueuedSubmits()) > 0)) {
+				doPostSubmit(request, response, wellbeTakeCount);
 			}
 		} else if (CmppUtils.testRequestBinding(request)) {
 			throw_packet_timeout = request_idle_time >= this._activeTestIntervalTime;
@@ -161,53 +164,99 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 			if (request_submiting) {
 				int submitted_result_count = CmppUtils.extractRequestSubmittedRepliedCount(request);
 				int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
-				List<Submit> submitted_list = (List<Submit>) CmppUtils.extractRequestSubmitteds(request);
-				List<Submit> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
-				if (this.errorReturnQueue) {
-					Log.warn("For a long time not receive a reply, return submit to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
-					returnQueuedSubmits(unresult_list);
-				} else {
-					Log.warn("For a long time did not receive a reply, ignored submits, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
-				}
-				CmppUtils.cleanRequestSubmitteds(request);
-				int transmit_listener_size = ListUtils.size(transmitListener);
-				if (transmit_listener_size > 0 && unresult_list.size() > 0) {
-					for (int ii = 0; ii < unresult_list.size(); ii++) {
-						TransmitEvent event = new TransmitEvent(unresult_list.get(ii));
-						for (int i = 0; i < transmit_listener_size; i++) {
-							TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
-							try {
-								listener.transmitTimeout(event);
-							} catch (Exception e) {
-								Log.error("ignored submit transmit timeout error: " + e.getMessage(), e);
+				if (submitted_count > 0 && submitted_result_count < submitted_count) {
+					List<Submit> submitted_list = (List<Submit>) CmppUtils.extractRequestSubmitteds(request);
+					List<Submit> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
+					if (this.errorReturnQueue) {
+						Log.warn(String.format("长时间未收到短信提交应答, 把已提交短信返回待发送队列(%d/%d)", submitted_count, submitted_count));
+						returnQueuedSubmits(unresult_list);
+					} else {
+						Log.warn(String.format("长时间未收到短信提交应答，忽略返回待发队列(%d/%d)", submitted_count, submitted_count));
+					}
+					int transmit_listener_size = ListUtils.size(transmitListener);
+					if (transmit_listener_size > 0 && unresult_list.size() > 0) {
+						for (int ii = 0; ii < unresult_list.size(); ii++) {
+							TransmitEvent event = null;
+							if (this.errorReturnQueue) {
+								event = new TransmitEvent(unresult_list.get(ii));
+							} else {
+								Submit submitted = unresult_list.get(ii);
+								SubmitResponse res = (SubmitResponse) context_cmpp_packet_maps.get(
+										Commands.CMPP_SUBMIT_RESP).clone();
+								res.result = 1;
+								event = new TransmitEvent(new Object[] { submitted, res });
+							}
+							for (int i = 0; i < transmit_listener_size; i++) {
+								TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
+								try {
+									if (this.errorReturnQueue) {
+										listener.transmitTimeout(event);
+									} else {
+										listener.endTransmit(event);
+									}
+								} catch (Exception e) {
+									Log.warn(String.format("忽略应答超时后处理错误(%s)", e.getMessage()), e);
+								}
 							}
 						}
 					}
 				}
+
+				CmppUtils.cleanRequestSubmitteds(request);
 			}
-			throw new PacketException(String.format(request_activetest_count + " times active test, but not reply"));
+			throw new PacketException(String.format("%d次存活测试未收到应答", request_activetest_count));
 		}
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	protected void handleDisConnect(Request request, Response response) {
-		if (CmppUtils.testRequestBinded(request)&& CmppUtils.testRequestSubmiting(request)) {
+		if (CmppUtils.testRequestBinded(request) && CmppUtils.testRequestSubmiting(request)) {
 			int submitted_result_count = CmppUtils.extractRequestSubmittedRepliedCount(request);
 			int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
-			if (this.errorReturnQueue) {
-				Log.warn("return submitted to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_result_count);
+			if (submitted_count > 0 && submitted_result_count < submitted_count) {
 				List<Submit> submitted_list = (List<Submit>) CmppUtils.extractRequestSubmitteds(request);
-				returnQueuedSubmits(submitted_list.subList(submitted_result_count, submitted_count));
-			} else {
-				Log.warn("ignore submits, submit-count=" + submitted_count + ", reply-count=" + submitted_result_count);
+				List<Submit> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
+				if (this.errorReturnQueue) {
+					Log.warn(String.format("连接断开，返回已提交未应答短信至待发队列(%d/%d)", submitted_result_count, submitted_count));
+					returnQueuedSubmits(unresult_list);
+				} else {
+					Log.warn(String.format("连接断开，忽略已提交未应答短信(%d/%d)", submitted_result_count, submitted_count));
+					int transmit_listener_size = ListUtils.size(transmitListener);
+					if (transmit_listener_size > 0 && unresult_list.size() > 0) {
+						for (int ii = 0; ii < unresult_list.size(); ii++) {
+							TransmitEvent event = null;
+							if (this.errorReturnQueue) {
+								event = new TransmitEvent(unresult_list.get(ii));
+							} else {
+								Submit submitted = unresult_list.get(ii);
+								SubmitResponse res = (SubmitResponse) context_cmpp_packet_maps.get(
+										Commands.CMPP_SUBMIT_RESP).clone();
+								res.result = 1;
+								event = new TransmitEvent(new Object[] { submitted, res });
+							}
+							for (int i = 0; i < transmit_listener_size; i++) {
+								TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
+								try {
+									if (this.errorReturnQueue) {
+										listener.transmitTimeout(event);
+									} else {
+										listener.endTransmit(event);
+									}
+								} catch (Exception e) {
+									Log.warn(String.format("忽略应答断开后处理错误(%s)", e.getMessage()), e);
+								}
+							}
+						}
+					}
+				}
 			}
 			CmppUtils.cleanRequestSubmitteds(request);
 		}
 		super.handleDisConnect(request, response);
 	}
 
-	protected void doPostSubmit(Request request, Response response) throws IOException {
+	protected void doPostSubmit(Request request, Response response, int wellbeTakeCount) throws IOException {
 		// 上次流量统计的开始时间
 		long flowLastTime = CmppUtils.extractRequestFlowLastTime(request);
 		// 上次统计以来流量总数
@@ -226,14 +275,13 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 			flowTotal = 0;
 		}
 
-		// TODO 需要实现发送速度控制
 		String sp_number = Integer.toString(this.spNumber);
 		Integer submitted = Integer.valueOf(0);
 		List<Submit> takedPostSubmits = null;
 		try {
-			takedPostSubmits = takeQueuedSubmits();
+			takedPostSubmits = takeQueuedSubmits(wellbeTakeCount);
 		} catch (Throwable e) {
-			Log.error("take submit from queue error: " + e.getMessage(), e);
+			Log.warn("从待发队列中获取短信失败: " + e.getMessage(), e);
 		}
 		if (takedPostSubmits != null) {
 			for (Submit sb : takedPostSubmits) {
@@ -241,10 +289,12 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 				if (!StringUtils.hasText(sb.sourceId) || !sb.sourceId.startsWith(sp_number)) {
 					sb.sourceId = "" + this.spNumber;
 				}
-//				sb.nodeId = this.enterpriseId;
-//				sb.nodeTime = CalendarUtils.getTimestampInYearDuring(sb.createTimeMillis);
+				if (sb.submitCount >= this.packetSubmitRetryTimes) {
+					Log.warn(String.format("忽略已重发%d次给用户(%s)的短信:\n%s\n", sb.submitCount,
+							sb.getUserNumbersTrimCNPrefix(), sb.toString()));
+					continue;
+				}
 				sb.sequenceId = CmppUtils.generateRequestSequence(request);
-//				sb.nodeSeq = sb.sequenceId;
 				sb.protocolVersion = this.protocolVersion;
 				int transmit_listener_size = ListUtils.size(transmitListener);
 				if (transmit_listener_size > 0) {
@@ -254,13 +304,14 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 						try {
 							evnListener.beginTransmit(event);
 						} catch (Throwable e) {
-							Log.error("ignored submit begin transmit error: " + e.getMessage(), e);
+							Log.warn(String.format("被忽略的短信提交前处理错误(%s)", e.getMessage()), e);
 						}
 					}
 				}
 				try {
 					CmppUtils.renderDataPacket(request, response, sb);
 					response.flushBuffer();
+					sb.submitCount++;
 					CmppUtils.updateSubmitteds(request, takedPostSubmits, submitted + 1);
 					flowTotal++;
 					CmppUtils.updateRequestFlowTotal(request, flowLastTime, flowTotal);
@@ -269,6 +320,25 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 						returnQueuedSubmits(takedPostSubmits);
 					} else {
 						returnQueuedSubmits(takedPostSubmits.subList(submitted, takedPostSubmits.size()));
+						for (int ei = 0; ei < submitted; ei++) {
+							transmit_listener_size = ListUtils.size(transmitListener);
+							if (transmit_listener_size > 0) {
+								Submit ignSubmitted = takedPostSubmits.get(ei);
+								SubmitResponse res = (SubmitResponse) this.context_cmpp_packet_maps.get(
+										Commands.CMPP_SUBMIT_RESP).clone();
+								res.result = 1;
+								TransmitEvent event = new TransmitEvent(new Object[] { ignSubmitted, res });
+								for (int j = 0; j < transmit_listener_size; j++) {
+									TransmitListener evnListener = (TransmitListener) ListUtils
+											.get(transmitListener, j);
+									try {
+										evnListener.endTransmit(event);
+									} catch (Throwable ee) {
+										Log.warn(String.format("提交出错后被忽略的提交后处理错误(%s)", e.getMessage()), ee);
+									}
+								}
+							}
+						}
 					}
 					CmppUtils.cleanRequestSubmitteds(request);
 					throw e;
@@ -282,7 +352,7 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 						try {
 							evnListener.transmitted(event);
 						} catch (Throwable e) {
-							Log.error("ignored submit transmit error: " + e.getMessage(), e);
+							Log.warn(String.format("被忽略的提交后处理错误(%s)", e.getMessage()), e);
 						}
 					}
 				}
@@ -311,10 +381,10 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 		}
 
 		DeliverResponse deliver_response = new DeliverResponse();
-		
-		//必须相同
+
+		// 必须相同
 		deliver_response.sequenceId = deliver_packet.sequenceId;
-		
+
 		// 构建msgid
 		deliver_response.nodeId = deliver_packet.nodeId;
 		deliver_response.nodeTime = deliver_packet.nodeTime;
@@ -323,6 +393,10 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 		deliver_response.result = result;
 		CmppUtils.renderDataPacket(request, response, deliver_response);
 		response.flushBuffer();
+		int wellbeTakeCount = 0;
+		if (!CmppUtils.testRequestSubmiting(request) && ((wellbeTakeCount = testQueuedSubmits()) > 0)) {
+			doPostSubmit(request, response, wellbeTakeCount);
+		}
 	}
 
 	@Override
@@ -351,9 +425,7 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 			CmppUtils.updateSubmittedRepliedCount(request, last_pare_submit_index + 1);
 			Submit submitted = posts.get(last_pare_submit_index);
 			int transmit_listener_size = ListUtils.size(transmitListener);
-			
-			//TODO 临时日志
-			//Log.info("submit replied|" + CmppUtils.extractRequestSubmittedRepliedCount(request) + ", " + CmppUtils.extractRequestSubmittedCount(request));
+
 			if (transmit_listener_size > 0) {
 				TransmitEvent event = new TransmitEvent(new Object[] { submitted, res });
 				for (int j = 0; j < ListUtils.size(transmitListener); j++) {
@@ -361,25 +433,25 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 					try {
 						evnListener.endTransmit(event);
 					} catch (Throwable e) {
-						Log.error("ignored submit end transmit error: " + e.getMessage(), e);
+						Log.warn(String.format("被忽略的短信提交网关应答后处理错误(%s)", e.getMessage()), e);
 					}
 				}
 			}
-			
+
 			if (CmppUtils.extractRequestSubmittedRepliedCount(request) >= CmppUtils
 					.extractRequestSubmittedCount(request)) {
-				//Log.info("batch submitted success |" + CmppUtils.extractRequestSubmittedRepliedCount(request) + ", " + CmppUtils.extractRequestSubmittedCount(request));
 				returnQueuedSubmits(null);
 				CmppUtils.cleanRequestSubmitteds(request);
 				do_unbind = isAutoReSubmit() ? false : true;
-				if (testQueuedSubmits()) {
-					this.doPostSubmit(request, response);
+				int wellbeTakeCount = 0;
+				if ((wellbeTakeCount = testQueuedSubmits()) > 0) {
+					this.doPostSubmit(request, response, wellbeTakeCount);
 				} else {
 					do_unbind = isAutoReSubmit() ? false : true;
 				}
 			}
 		} else {
-			Log.warn("not found submitted, but receive submit reply???");
+			Log.warn("未提交短信，却收到提交应答指令???");
 			do_unbind = isAutoReSubmit() ? false : true;
 		}
 
@@ -404,45 +476,30 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 		if (res.status == 0) {
 			CmppUtils.setupRequestBinded(request, true);
 			CmppUtils.updateRequestProtocolVersion(request, res.protocolVersion);
-			if (testQueuedSubmits()) {
-				doPostSubmit(request, response);
+			int wellbeTakeCount = 0;
+			if ((wellbeTakeCount = testQueuedSubmits()) > 0) {
+				doPostSubmit(request, response, wellbeTakeCount);
 			}
 		} else {
-			throw new ConnectException("login error, please check user or password or validate your ip address, response: " + res.toString());
+			throw new ConnectException("登录错误, 请检查用户或密码错误以及客户IP是否正确, 应答: " + res.toString());
 		}
 	}
 
-	//@SuppressWarnings("unchecked")
 	@Override
 	protected void doActiveTest(Request request, Response response) throws IOException {
 		super.doActiveTest(request, response);
-		//TODO 临时日志
-		//Log.warn("收到来自服务器端的链路侦测包");
-		/*
-		if (CmppUtils.testRequestSubmiting(request)) {
-			int submitted_result_count = CmppUtils.extractRequestSubmittedRepliedCount(request);
-			int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
-			Log.warn("Submit not reply but active test receive, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
-			
-			List<Submit> submitted_list = (List<Submit>) CmppUtils.extractRequestSubmitteds(request);
-			returnQueuedSubmits(submitted_list.subList(submitted_result_count, submitted_count));
-			CmppUtils.cleanRequestSubmitteds(request);
-		} else if (testQueuedSubmits()) {
-			doPostSubmit(request, response);
-		}
-		*/
-		if (!CmppUtils.testRequestSubmiting(request) && testQueuedSubmits()) {
-			doPostSubmit(request, response);
+		int wellbeTakeCount = 0;
+		if (!CmppUtils.testRequestSubmiting(request) && ((wellbeTakeCount = testQueuedSubmits()) > 0)) {
+			doPostSubmit(request, response, wellbeTakeCount);
 		}
 	}
 
 	@Override
 	protected void doActiveTestResponse(Request request, Response response) throws IOException {
 		super.doActiveTestResponse(request, response);
-		//TODO 临时日志
-		//Log.warn("发送置服务端的链路侦测包已应答");
-		if (!CmppUtils.testRequestSubmiting(request) && testQueuedSubmits()) {
-			doPostSubmit(request, response);
+		int wellbeTakeCount = 0;
+		if (!CmppUtils.testRequestSubmiting(request) && ((wellbeTakeCount = testQueuedSubmits()) > 0)) {
+			doPostSubmit(request, response, wellbeTakeCount);
 		}
 	}
 

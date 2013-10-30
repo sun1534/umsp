@@ -8,9 +8,9 @@ public abstract class AbstractSgipContextSPHandler extends AbstractSgipContextHa
 
 	protected String smgHost;
 
-	protected int spNumber;
+	protected String spNumber;
 
-	protected int enterpriseId;
+	protected String enterpriseId;
 
 	protected int areaId;
 
@@ -25,7 +25,7 @@ public abstract class AbstractSgipContextSPHandler extends AbstractSgipContextHa
 	public int getNodeId() {
 		if (nodeId == 0) {
 			int aid = areaId;
-			nodeId = (int) (3000000000L + aid * 100000 + enterpriseId);
+			nodeId = (int) (3000000000L + aid * 100000 + Integer.parseInt(enterpriseId));
 		}
 		return nodeId;
 	}
@@ -42,11 +42,11 @@ public abstract class AbstractSgipContextSPHandler extends AbstractSgipContextHa
 		this.smgHost = smgHost;
 	}
 
-	public void setSpNumber(int spNumber) {
+	public void setSpNumber(String spNumber) {
 		this.spNumber = spNumber;
 	}
 
-	public void setEnterpriseId(int enterpriseId) {
+	public void setEnterpriseId(String enterpriseId) {
 		this.enterpriseId = enterpriseId;
 		this.nodeId = 0;
 	}

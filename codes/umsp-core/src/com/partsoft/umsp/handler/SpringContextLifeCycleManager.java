@@ -15,6 +15,7 @@ import com.partsoft.utils.Assert;
 import com.partsoft.utils.CompareUtils;
 import com.partsoft.utils.ListUtils;
 
+@Deprecated
 public class SpringContextLifeCycleManager implements ApplicationContextAware, ApplicationListener<ApplicationEvent>,
 		InitializingBean {
 

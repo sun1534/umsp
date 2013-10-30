@@ -69,15 +69,25 @@ public abstract class AbstractConnector extends AbstractBuffers implements Conne
 
 	transient int _connectionsRequestsMin; // min requests per connection
 	transient int _connectionsRequestsMax; // max requests per connection
-	
+
 	private boolean _ignoredEofException = true;
-	
+
+	private boolean _ignoredConnectionException = false;
+
 	public void setIgnoredEofException(boolean ignoredEofException) {
 		this._ignoredEofException = ignoredEofException;
 	}
-	
+
 	public boolean isIgnoredEofException() {
 		return _ignoredEofException;
+	}
+
+	public boolean isIgnoredConnectionException() {
+		return _ignoredConnectionException;
+	}
+
+	public void setIgnoredConnectionException(boolean value) {
+		this._ignoredConnectionException = value;
 	}
 
 	public AbstractConnector() {
@@ -453,9 +463,9 @@ public abstract class AbstractConnector extends AbstractBuffers implements Conne
 	}
 
 	protected void connectionOpened(PacketConnection connection) {
-		Log.info("TCP connected, remote(" + connection.getRequest().getRemoteAddr() + ":"
-				+ connection.getRequest().getRemotePort() + ")" + ", local(" + connection.getRequest().getLocalAddr()
-				+ ":" + connection.getRequest().getLocalPort() + ")");
+		if (!isIgnoredConnectionException()) {
+			Log.info(String.format("%s已连接", connection.toString()));
+		}
 
 		if (_statsStartedAt == -1)
 			return;
@@ -470,17 +480,19 @@ public abstract class AbstractConnector extends AbstractBuffers implements Conne
 		boolean log_exception = true;
 		if (e instanceof EofException && isIgnoredEofException()) {
 			log_exception = false;
+		} else if (isIgnoredConnectionException()) {
+			log_exception = false;
 		}
 		if (log_exception) {
-			Log.error(connection.toString() + " handler error: " + e.getMessage(), e);
+			Log.error(String.format("连接上下文(%s)处理出错，错误内容：%s", connection.toString(), e.getMessage()), e);
 		}
 	}
 
 	protected void connectionClosed(PacketConnection connection) {
-		Log.info("TCP connect termiante, remote(" + connection.getRequest().getRemoteAddr() + ":"
-				+ connection.getRequest().getRemotePort() + ")" + ", local(" + connection.getRequest().getLocalAddr()
-				+ ":" + connection.getRequest().getLocalPort() + ")");
-		
+		if (!isIgnoredConnectionException()) {
+			Log.info(String.format("%s已断开", connection.toString()));
+		}
+
 		if (_statsStartedAt >= 0) {
 			long duration = System.currentTimeMillis() - connection.getTimeStamp();
 			int requests = connection.getRequests();
@@ -588,7 +600,6 @@ public abstract class AbstractConnector extends AbstractBuffers implements Conne
 
 		public void dispatch() throws InterruptedException, IOException {
 			if (getThreadPool() == null || !getThreadPool().dispatch(this)) {
-				Log.warn(String.format("dispatch failed for %s", _connection.toString()));
 				close();
 			}
 		}
@@ -613,14 +624,8 @@ public abstract class AbstractConnector extends AbstractBuffers implements Conne
 				synchronized (_connectionSet) {
 					_connectionSet.add(this);
 				}
-				if (Log.isDebugEnabled()) {
-					Log.debug("enter loop for process connection");
-				}
 				while (isStarted() && !isClosed()) {
 					if (_connection.isIdle()) {
-						if (Log.isDebugEnabled()) {
-							Log.debug("connection for a long time without answering");
-						}
 						if (getOrigin().getThreadPool().isLowOnThreads()) {
 							int lrmit = getLowResourceMaxIdleTime();
 							if (lrmit >= 0 && _sotimeout != lrmit) {
@@ -632,9 +637,6 @@ public abstract class AbstractConnector extends AbstractBuffers implements Conne
 					_connection.handle();
 				}
 			} catch (EofException e) {
-				if (Log.isDebugEnabled()) {
-					Log.debug("EOF", e);
-				}
 				try {
 					connectionException(_connection, e);
 				} catch (Throwable e1) {
@@ -646,9 +648,6 @@ public abstract class AbstractConnector extends AbstractBuffers implements Conne
 					Log.ignore(e2);
 				}
 			} catch (IOException e) {
-				if (Log.isDebugEnabled()) {
-					Log.debug("IOE", e);
-				}
 				try {
 					connectionException(_connection, e);
 				} catch (Throwable e1) {
@@ -660,7 +659,6 @@ public abstract class AbstractConnector extends AbstractBuffers implements Conne
 					Log.warn(e2);
 				}
 			} catch (Throwable e) {
-				Log.warn("handle failed", e);
 				try {
 					connectionException(_connection, e);
 				} catch (Throwable e1) {
@@ -672,9 +670,6 @@ public abstract class AbstractConnector extends AbstractBuffers implements Conne
 					Log.ignore(e2);
 				}
 			} finally {
-				if (Log.isDebugEnabled()) {
-					Log.debug("end loop for process connection");
-				}
 				connectionClosed(_connection);
 				synchronized (_connectionSet) {
 					_connectionSet.remove(this);

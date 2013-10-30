@@ -22,15 +22,14 @@ public class BatchPoolSgipSPSendHandler extends AbstractSgipSPSendHandler {
 	}
 
 	@Override
-	protected List<Submit> takeQueuedSubmits() {
+	protected List<Submit> takeQueuedSubmits(int count) {
 		Assert.notNull(this.batchPool);
-		return this.batchPool.takeObjects(getMaxOnceSubmits());
+		return this.batchPool.takeObjects(count > getMaxOnceSubmits() ? getMaxOnceSubmits() : count);
 	}
 
 	@Override
-	protected boolean testQueuedSubmits() {
-		return this.batchPool.isPooling();
+	protected int testQueuedSubmits() {
+		return this.batchPool.countPooling(getMaxOnceSubmits());
 	}
 	
-
 }

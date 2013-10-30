@@ -6,7 +6,7 @@ public abstract class AbstractBuffers extends AbstractLifeCycle implements Buffe
 
 	private int _requestBufferSize = 2 * 1024;
 
-	private int _responseBufferSize = 2 * 1024;
+	private int _responseBufferSize = 1024;
 
 	final static private int __REQUEST = 0;
 	final static private int __RESPONSE = 1;
@@ -40,12 +40,11 @@ public abstract class AbstractBuffers extends AbstractLifeCycle implements Buffe
 		return newBuffer(size);
 	}
 
-	public void returnBuffer(Buffer buffer) {
+	public void returnBuffer(int size, Buffer buffer) {
 		buffer.clear();
 		if (buffer.isVolatile() || buffer.isImmutable())
 			return;
 
-		int size = buffer.capacity();
 		final int set = (size == _responseBufferSize) ? __RESPONSE : (size == _requestBufferSize) ? __REQUEST : __OTHER;
 
 		final ThreadBuffers thread_buffers = (ThreadBuffers) _buffers.get();

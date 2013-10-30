@@ -23,7 +23,7 @@ public class PacketClientConnector extends AbstractConnector {
 	protected int _connectTimeout = 1500;
 
 	/**
-	 * @brief 重连间隔时间，单位：毫秒，默认值（30秒）
+	 * @brief 重连间隔时间，单位：毫秒，默认值(30秒)
 	 */
 	protected long _reConnectIntervalTime = 30000;
 
@@ -32,11 +32,10 @@ public class PacketClientConnector extends AbstractConnector {
 	private Proxy proxy;
 
 	private int _dispatchedConnections = 0;
-	
-	
+
 	public PacketClientConnector() {
 	}
-	
+
 	public PacketClientConnector(String host, int port) {
 		super();
 		setHost(host);
@@ -109,7 +108,7 @@ public class PacketClientConnector extends AbstractConnector {
 	public void connect(int connectID) throws IOException, InterruptedException {
 		Socket _clientSocket = newClientSocket(getHost(), getPort());
 		if (Log.isDebugEnabled()) {
-			Log.debug(String.format("server (%s) connected, setup socket config", _clientSocket
+			Log.debug(String.format("已连接至服务器(%s), 设置套接字参数...", _clientSocket
 					.getRemoteSocketAddress().toString()));
 		}
 		configure(_clientSocket);
@@ -119,11 +118,6 @@ public class PacketClientConnector extends AbstractConnector {
 			_dispatchedConnections++;
 		}
 	}
-
-//	protected PacketConnection newPacketConnection(EndPoint endpoint) {
-//		return new PacketConnection(this.getOrigin(), this, this, endpoint, new PacketGenerator(this, endpoint,
-//				getResponseBufferSize()));
-//	}
 
 	protected Buffer newBuffer(int size) {
 		return new ByteArrayBuffer(size);
@@ -186,7 +180,7 @@ public class PacketClientConnector extends AbstractConnector {
 		synchronized (this) {
 			_dispatchedConnections--;
 		}
-		
+
 		if (isAutoReConnect()) {
 			return;
 		}
@@ -195,7 +189,7 @@ public class PacketClientConnector extends AbstractConnector {
 			try {
 				getOrigin().delayStop();
 				if (Log.isDebugEnabled())
-					Log.debug("no connection exited");
+					Log.debug("无连接退出");
 			} catch (Exception e) {
 				Log.error(e.getMessage(), e);
 			}
@@ -210,6 +204,9 @@ public class PacketClientConnector extends AbstractConnector {
 		}
 
 		private void doAutoReConnectHandle() {
+			if (Log.isDebugEnabled()) {
+				Log.debug("进入自动连接模式@" + PacketClientConnector.this + "[" + _connector + "]");
+			}
 			Thread current = Thread.currentThread();
 			String name;
 			synchronized (PacketClientConnector.this) {
@@ -225,17 +222,23 @@ public class PacketClientConnector extends AbstractConnector {
 				current.setPriority(old_priority - getAcceptorPriorityOffset());
 				for (int i = 0; i < getMaxConnection() && isStarted(); i++) {
 					if (Log.isDebugEnabled()) {
-						Log.debug(String.format("connect to server %s", getName()));
+						Log.debug(String.format("正在连接至服务器(%s)...", getName()));
 					}
 					try {
 						connect(i);
 						Thread.sleep(100);
+						Thread.yield();
 					} catch (Throwable e) {
-						Log.error(e.getMessage(), e);
+						if (!isIgnoredConnectionException()) {
+							Log.error(String.format("连接服务器(%s)失败，错误信息： %s", getName(), e.getMessage()));
+						}
+						if (Log.isDebugEnabled()) {
+							Log.debug(e.getMessage(), e);
+						}
 						break;
 					}
 				}
-				
+
 				int sleepCount = 0;
 				while (isStarted()) {
 					try {
@@ -244,19 +247,25 @@ public class PacketClientConnector extends AbstractConnector {
 						break;
 					}
 					sleepCount = sleepCount + 1;
-					if (!isStarted()) break;
-					
+					if (!isStarted())
+						break;
+
 					if ((sleepCount * SLEEP_TIME) > getReConnectIntervalTime()) {
 						synchronized (PacketClientConnector.this) {
 							if (_dispatchedConnections < getMaxConnection()) {
 								if (Log.isDebugEnabled()) {
-									Log.debug(String.format("reconnect to server %s", getName()));
+									Log.debug(String.format("准备重新连接服务器(%s)", getName()));
 								}
 								try {
 									connect(_dispatchedConnections);
 									Thread.sleep(100);
 								} catch (Throwable e) {
-									Log.error(e.getMessage(), e);
+									if (!isIgnoredConnectionException()) {
+										Log.error(String.format("连接服务器(%s)失败，错误信息： %s", getName(), e.getMessage()));
+									}
+									if (Log.isDebugEnabled()) {
+										Log.debug(e.getMessage(), e);
+									}
 								}
 							}
 						}
@@ -292,7 +301,7 @@ public class PacketClientConnector extends AbstractConnector {
 				for (; connectioned < getMaxConnection() && isStarted(); connectioned++) {
 					try {
 						if (Log.isDebugEnabled()) {
-							Log.debug(String.format("connect to server %s", getName()));
+							Log.debug(String.format("正在连接服务器(%s)...", getName()));
 						}
 						connect(connectioned);
 						Thread.sleep(100);
@@ -311,7 +320,9 @@ public class PacketClientConnector extends AbstractConnector {
 							mex.ifExceptionThrow();
 						} catch (Exception e) {
 							try {
-								Log.error("need for one successful connection", e);
+								if (!isIgnoredConnectionException()) {
+									Log.error(String.format("连接至服务器(%s)的当前配置要求至少成功连接", getName()));
+								}
 								getOrigin().pushDelayException(e);
 								getOrigin().delayStop();
 							} catch (Exception noe) {

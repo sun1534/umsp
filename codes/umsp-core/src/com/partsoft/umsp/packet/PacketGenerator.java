@@ -23,7 +23,7 @@ public class PacketGenerator extends AbstractGenerator {
 
 	public void addContent(Buffer content, boolean last) throws IOException {
 		if (_last || _state == STATE_END) {
-			if (Log.isDebugEnabled()) Log.debug(String.format("Ignoring extra content %s", content.toString()));
+			if (Log.isDebugEnabled()) Log.debug(String.format("忽略额外的内容: %s", content.toString()));
 			content.clear();
 			return;
 		}
@@ -72,7 +72,7 @@ public class PacketGenerator extends AbstractGenerator {
 
 		_content = response;
 		_bypass = true;
-		// _state = STATE_WRITED;
+
 		_state = STATE_END;
 
 		// TODO this is not exactly right, but should do.
@@ -89,7 +89,9 @@ public class PacketGenerator extends AbstractGenerator {
 	 */
 	public boolean addContent(byte b) throws IOException {
 		if (_last || _state == STATE_END) {
-			if (Log.isDebugEnabled()) Log.debug(String.format("Ignoring extra content %d", new Byte(b)));
+			if (Log.isDebugEnabled()) {
+				Log.debug(String.format("忽略额外数据: %d", new Byte(b)));
+			}
 			return false;
 		}
 

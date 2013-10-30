@@ -492,7 +492,6 @@ public class PacketContextHandler extends HandlerWrapper implements Attributes, 
 				if (handler != null)
 					handler.handle(protocol, request, response, dispatch);
 			} catch (PacketException e) {
-				if (Log.isDebugEnabled()) Log.debug(e);
 				base_response.errorTerminated();
 				throw e;
 			} finally {

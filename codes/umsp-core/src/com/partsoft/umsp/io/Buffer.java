@@ -328,6 +328,8 @@ public interface Buffer extends Cloneable
      * @return a <code>String</code> value describing the state and contents of the buffer.
      */
     String toDetailString();
+    
+    String toAllDetailString();
 
     /* ------------------------------------------------------------ */
     /** Write the buffer's contents to the output stream
@@ -370,6 +372,8 @@ public interface Buffer extends Cloneable
     
     public interface CaseInsensitve
     {}
+
+	void increaseCapacity(int i);
 
     
     

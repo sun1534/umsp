@@ -11,7 +11,7 @@ import com.partsoft.umsp.handler.TransmitEvent;
 import com.partsoft.umsp.handler.TransmitListener;
 import com.partsoft.umsp.log.Log;
 import com.partsoft.umsp.packet.PacketException;
-import com.partsoft.umsp.sgip.SgipUtils;
+import com.partsoft.umsp.smgp.Constants.RequestIDs;
 import com.partsoft.umsp.smgp.Submit;
 import com.partsoft.umsp.smgp.Constants.LoginModes;
 import com.partsoft.umsp.smgp.Constants.StatusCodes;
@@ -42,12 +42,12 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 	 * @brief 一次最多发送16条
 	 */
 	protected int _maxOnceSubmits = 10;
-	
+
 	/**
 	 * 最大每秒提交数
 	 */
 	protected int maxSubmitPerSecond = 50;
-	
+
 	/**
 	 * 发生错误时是否返回队列
 	 */
@@ -63,7 +63,7 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 	public void setLoginMode(int loginMode) {
 		this._loginMode = loginMode;
 	}
-	
+
 	public void setErrorReturnQueue(boolean errorReturnQueue) {
 		this.errorReturnQueue = errorReturnQueue;
 	}
@@ -122,14 +122,14 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 	 * 
 	 * @return
 	 */
-	protected abstract List<Submit> takeQueuedSubmits();
+	protected abstract List<Submit> takeQueuedSubmits(int count);
 
 	/**
 	 * 判断是否有排队的数据
 	 * 
 	 * @return
 	 */
-	protected abstract boolean testQueuedSubmits();
+	protected abstract int testQueuedSubmits();
 
 	/**
 	 * 接收消息
@@ -145,56 +145,73 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 	 */
 	protected abstract void doReceivedReport(Deliver report);
 
+	@SuppressWarnings("unchecked")
 	@Override
 	protected void handleTimeout(Request request, Response response) throws IOException {
 		long request_idle_time = System.currentTimeMillis() - request.getRequestTimestamp();
 		boolean request_submitting = SmgpUtils.testRequestSubmiting(request);
 		int request_activetest_count = SmgpUtils.extractRequestActiveTestCount(request);
-		
+
 		boolean throw_packet_timeout = false;
-		
+		int wellbeTakeCount = 0;
 		if (SmgpUtils.testRequestBinded(request) && request_activetest_count < getMaxActiveTestCount()) {
 			if (request_idle_time >= this._activeTestIntervalTime * (request_activetest_count + 1)) {
 				doActiveTestRequest(request, response);
-			} else if (request_activetest_count <= 0 && !request_submitting && testQueuedSubmits()) {
-				doPostSubmit(request, response);
+			} else if (request_activetest_count <= 0 && !request_submitting
+					&& ((wellbeTakeCount = testQueuedSubmits()) > 0)) {
+				doPostSubmit(request, response, wellbeTakeCount);
 			}
 		} else if (SmgpUtils.testRequestBinding(request)) {
 			throw_packet_timeout = request_idle_time >= this._activeTestIntervalTime;
 		} else {
 			throw_packet_timeout = true;
 		}
-		
+
 		if (throw_packet_timeout) {
 			if (request_submitting) {
 				// 如果有submit再队列中，则回退。
 				int submitted_result_count = SmgpUtils.extractRequestSubmittedRepliedCount(request);
 				int submitted_count = SmgpUtils.extractRequestSubmittedCount(request);
-				List<Submit> submitted_list = SmgpUtils.extractRequestSubmitteds(request);
-				List<Submit> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
-				if (this.errorReturnQueue) {
-					Log.warn("For a long time not receive a reply, return to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
-					returnQueuedSubmits(unresult_list);
-				} else {
-					Log.warn("For a long time not receive a reply, ignored submits, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
-				}
-				SmgpUtils.cleanRequestSubmitteds(request);
-				int transmit_listener_size = ListUtils.size(transmitListener);
-				if (transmit_listener_size > 0 && unresult_list.size() > 0) {
-					for (int ii = 0; ii < unresult_list.size(); ii++) {
-						TransmitEvent event = new TransmitEvent(unresult_list.get(ii));
-						for (int i = 0; i < transmit_listener_size; i++) {
-							TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
-							try {
-								listener.transmitTimeout(event);
-							} catch (Exception e) {
-								Log.error("ignored submit transmit timeout error: " + e.getMessage(), e);
+				if (submitted_count > 0 && submitted_result_count < submitted_count) {
+					List<Submit> submitted_list = (List<Submit>) SmgpUtils.extractRequestSubmitteds(request);
+					List<Submit> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
+					if (this.errorReturnQueue) {
+						Log.warn(String.format("长时间未收到短信提交应答, 把已提交短信返回待发送队列(%d/%d)", submitted_count, submitted_count));
+						returnQueuedSubmits(unresult_list);
+					} else {
+						Log.warn(String.format("长时间未收到短信提交应答，忽略返回待发队列(%d/%d)", submitted_count, submitted_count));
+					}
+					int transmit_listener_size = ListUtils.size(transmitListener);
+					if (transmit_listener_size > 0 && unresult_list.size() > 0) {
+						for (int ii = 0; ii < unresult_list.size(); ii++) {
+							TransmitEvent event = null;
+							if (this.errorReturnQueue) {
+								event = new TransmitEvent(unresult_list.get(ii));
+							} else {
+								Submit submitted = unresult_list.get(ii);
+								SubmitResponse res = (SubmitResponse) this.context_smgp_packet_maps.get(
+										RequestIDs.submit_resp).clone();
+								res.Status = 1;
+								event = new TransmitEvent(new Object[] { submitted, res });
+							}
+							for (int i = 0; i < transmit_listener_size; i++) {
+								TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
+								try {
+									if (this.errorReturnQueue) {
+										listener.transmitTimeout(event);
+									} else {
+										listener.endTransmit(event);
+									}
+								} catch (Exception e) {
+									Log.warn(String.format("忽略应答超时后处理错误(%s)", e.getMessage()), e);
+								}
 							}
 						}
 					}
 				}
+				SmgpUtils.cleanRequestSubmitteds(request);
 			}
-			throw new PacketException(String.format(request_activetest_count + " times active test, but not reply"));
+			throw new PacketException(String.format("%d次存活测试未收到应答", request_activetest_count));
 		}
 	}
 
@@ -202,23 +219,55 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 		this.maxSubmitPerSecond = maxSubmitPerSecond;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	protected void handleDisConnect(Request request, Response response) {
 		if (SmgpUtils.testRequestBinded(request) && SmgpUtils.testRequestSubmiting(request)) {
-			int submittedCount = SgipUtils.extractRequestSubmittedCount(request);
-			int submittedResultCount = SgipUtils.extractRequestSubmittedRepliedCount(request);
-			if (this.errorReturnQueue) {
-				Log.warn("return submitted to queue, submit-count=" + submittedCount + ", reply-count=" + submittedResultCount);
-				List<Submit> submitts = SmgpUtils.extractRequestSubmitteds(request);
-				returnQueuedSubmits(submitts.subList(submittedResultCount, submittedCount));
-			} else {
-				Log.warn("ignore submits, submit-count=" + submittedCount + ", reply-count=" + submittedResultCount);
+			int submitted_count = SmgpUtils.extractRequestSubmittedCount(request);
+			int submitted_result_count = SmgpUtils.extractRequestSubmittedRepliedCount(request);
+			if (submitted_count > 0 && submitted_result_count < submitted_count) {
+				List<Submit> submitted_list = (List<Submit>) SmgpUtils.extractRequestSubmitteds(request);
+				List<Submit> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
+				if (this.errorReturnQueue) {
+					Log.warn(String.format("连接断开，返回已提交未应答短信至待发队列(%d/%d)", submitted_result_count, submitted_count));
+					returnQueuedSubmits(unresult_list);
+				} else {
+					Log.warn(String.format("连接断开，忽略已提交未应答短信(%d/%d)", submitted_result_count, submitted_count));
+					int transmit_listener_size = ListUtils.size(transmitListener);
+					if (transmit_listener_size > 0 && unresult_list.size() > 0) {
+						for (int ii = 0; ii < unresult_list.size(); ii++) {
+							TransmitEvent event = null;
+							if (this.errorReturnQueue) {
+								event = new TransmitEvent(unresult_list.get(ii));
+							} else {
+								Submit submitted = unresult_list.get(ii);
+								SubmitResponse res = (SubmitResponse) context_smgp_packet_maps.get(
+										RequestIDs.submit_resp).clone();
+								res.Status = 1;
+								event = new TransmitEvent(new Object[] { submitted, res });
+							}
+							for (int i = 0; i < transmit_listener_size; i++) {
+								TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
+								try {
+									if (this.errorReturnQueue) {
+										listener.transmitTimeout(event);
+									} else {
+										listener.endTransmit(event);
+									}
+								} catch (Exception e) {
+									Log.warn(String.format("忽略应答超时后处理错误(%s)", e.getMessage()), e);
+								}
+							}
+						}
+					}
+				}
 			}
+			SmgpUtils.cleanRequestSubmitteds(request);
 		}
 		super.handleDisConnect(request, response);
 	}
 
-	protected void doPostSubmit(Request request, Response response) throws IOException {
+	protected void doPostSubmit(Request request, Response response, int wellbeTakeCount) throws IOException {
 
 		// 上次流量统计的开始时间
 		long flowLastTime = SmgpUtils.extractRequestFlowLastTime(request);
@@ -244,13 +293,18 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 
 		List<Submit> takedPostSubmits = null;
 		try {
-			takedPostSubmits = takeQueuedSubmits();
+			takedPostSubmits = takeQueuedSubmits(wellbeTakeCount);
 		} catch (Throwable e) {
-			Log.error("taked submit from queue error: " + e.getMessage(), e);
+			Log.warn("从待发队列中获取短信失败: " + e.getMessage(), e);
 		}
 		for (Submit sb : takedPostSubmits) {
 			if (!StringUtils.hasText(sb.SrcTermID) || !sb.SrcTermID.startsWith(sp_numer)) {
 				sb.SrcTermID = sp_numer;
+			}
+			if (sb.submitCount >= this.packetSubmitRetryTimes) {
+				Log.warn(String.format("忽略已重发%d次给用户(%s)的短信:\n%s\n", sb.submitCount,
+						sb.getUserNumbersTrimCNPrefix(), sb.toString()));
+				continue;
 			}
 			sb.MsgType = 6;
 			sb.sequenceId = SmgpUtils.generateRequestSequence(request);
@@ -263,7 +317,7 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 					try {
 						evnListener.beginTransmit(event);
 					} catch (Throwable e) {
-						Log.error("ignored submit begin transmit error: " + e.getMessage(), e);
+						Log.warn(String.format("被忽略的短信提交前处理错误(%s)", e.getMessage()), e);
 					}
 				}
 			}
@@ -279,7 +333,26 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 					returnQueuedSubmits(takedPostSubmits);
 				} else {
 					returnQueuedSubmits(takedPostSubmits.subList(submitted, takedPostSubmits.size()));
+					for (int ei = 0; ei < submitted; ei++) {
+						transmit_listener_size = ListUtils.size(transmitListener);
+						if (transmit_listener_size > 0) {
+							Submit ignSubmitted = takedPostSubmits.get(ei);
+							SubmitResponse res = (SubmitResponse) this.context_smgp_packet_maps.get(
+									RequestIDs.submit_resp).clone();
+							res.Status = 1;
+							TransmitEvent event = new TransmitEvent(new Object[] { ignSubmitted, res });
+							for (int j = 0; j < transmit_listener_size; j++) {
+								TransmitListener evnListener = (TransmitListener) ListUtils.get(transmitListener, j);
+								try {
+									evnListener.endTransmit(event);
+								} catch (Throwable ee) {
+									Log.warn(String.format("提交出错后被忽略的提交后处理错误(%s)", e.getMessage()), ee);
+								}
+							}
+						}
+					}
 				}
+				SmgpUtils.cleanRequestSubmitteds(request);
 				throw e;
 			}
 			submitted++;
@@ -292,7 +365,7 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 					try {
 						evnListener.transmitted(event);
 					} catch (Throwable e) {
-						Log.error("ignored submit transmit error: " + e.getMessage(), e);
+						Log.warn(String.format("被忽略的提交后处理错误(%s)", e.getMessage()), e);
 					}
 				}
 			}
@@ -326,6 +399,11 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 		deliver_response.Status = responseStatus;
 		SmgpUtils.renderDataPacket(request, response, deliver_response);
 		response.flushBuffer();
+
+		int wellbeTakeCount = 0;
+		if (!SmgpUtils.testRequestSubmiting(request) && ((wellbeTakeCount = testQueuedSubmits()) > 0)) {
+			doPostSubmit(request, response, wellbeTakeCount);
+		}
 	}
 
 	@Override
@@ -341,6 +419,7 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 		response.flushBuffer();
 	}
 
+	@SuppressWarnings("unchecked")
 	protected void doSubmitResult(Request request, Response response) throws IOException {
 		SubmitResponse res = (SubmitResponse) SmgpUtils.extractRequestPacket(request);
 		if (Log.isDebugEnabled()) {
@@ -349,7 +428,7 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 		boolean do_unbind = false;
 		if (SmgpUtils.testRequestSubmiting(request)) {
 			int last_pare_submit_index = SmgpUtils.extractRequestSubmittedRepliedCount(request);
-			List<Submit> posts = SmgpUtils.extractRequestSubmitteds(request);
+			List<Submit> posts = (List<Submit>) SmgpUtils.extractRequestSubmitteds(request);
 			SmgpUtils.updateSubmittedRepliedCount(request, last_pare_submit_index + 1);
 			Submit submitted = posts.get(last_pare_submit_index);
 			int transmit_listener_size = ListUtils.size(transmitListener);
@@ -360,7 +439,7 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 					try {
 						evnListener.endTransmit(event);
 					} catch (Throwable e) {
-						Log.error("ignored end transmit error: " + e.getMessage(), e);
+						Log.warn(String.format("被忽略的短信提交网关应答后处理错误(%s)", e.getMessage()), e);
 					}
 				}
 			}
@@ -368,14 +447,15 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 					.extractRequestSubmittedCount(request)) {
 				returnQueuedSubmits(null);
 				SmgpUtils.cleanRequestSubmitteds(request);
-				if (testQueuedSubmits()) {
-					this.doPostSubmit(request, response);
+				int wellbeTakeCount = 0;
+				if ((wellbeTakeCount = testQueuedSubmits()) > 0) {
+					this.doPostSubmit(request, response, wellbeTakeCount);
 				} else {
 					do_unbind = isAutoReSubmit() ? false : true;
 				}
 			}
 		} else {
-			Log.warn("not found submitted, but receive submit reply???");
+			Log.warn("未提交短信，却收到提交应答指令???");
 			do_unbind = isAutoReSubmit() ? false : true;
 		}
 
@@ -400,42 +480,30 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 		if (res.Status == StatusCodes.ERR_SUCCESS) {
 			SmgpUtils.setupRequestBinded(request, true);
 			SmgpUtils.updateRequestProtocolVersion(request, res.Version);
-			if (testQueuedSubmits()) {
-				doPostSubmit(request, response);
+			int wellbeTakeCount = 0;
+			if ((wellbeTakeCount = testQueuedSubmits()) > 0) {
+				doPostSubmit(request, response, wellbeTakeCount);
 			}
 		} else {
-			throw new LoginException(
-					"login error, please check user or password or validate your ip address, response: "
-							+ res.toString());
+			throw new LoginException("登录错误, 请检查用户或密码错误以及客户IP是否正确, 应答: " + res.toString());
 		}
 	}
 
 	@Override
 	protected void doActiveTest(Request request, Response response) throws IOException {
 		super.doActiveTest(request, response);
-		/*
-		if (SmgpUtils.testRequestSubmiting(request)) {
-			int submitted_result_count = SmgpUtils.extractRequestSubmittedRepliedCount(request);
-			int submitted_count = SmgpUtils.extractRequestSubmittedCount(request);
-			Log.warn("Submit not reply but active test receive, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
-			
-			List<Submit> submitted_list = SmgpUtils.extractRequestSubmitteds(request);
-			returnQueuedSubmits(submitted_list.subList(submitted_result_count, submitted_count));
-			SmgpUtils.cleanRequestSubmitteds(request);
-		} else if (testQueuedSubmits()) {
-			doPostSubmit(request, response);
-		}
-		*/
-		if (!SmgpUtils.testRequestSubmiting(request) &&  testQueuedSubmits()) {
-			doPostSubmit(request, response);
+		int wellbeTakeCount = 0;
+		if (!SmgpUtils.testRequestSubmiting(request) && ((wellbeTakeCount = testQueuedSubmits()) > 0)) {
+			doPostSubmit(request, response, wellbeTakeCount);
 		}
 	}
 
 	@Override
 	protected void doActiveTestResponse(Request request, Response response) throws IOException {
 		super.doActiveTestResponse(request, response);
-		if (!SmgpUtils.testRequestSubmiting(request) &&  testQueuedSubmits()) {
-			doPostSubmit(request, response);
+		int wellbeTakeCount = 0;
+		if (!SmgpUtils.testRequestSubmiting(request) && ((wellbeTakeCount = testQueuedSubmits()) > 0)) {
+			doPostSubmit(request, response, wellbeTakeCount);
 		}
 	}
 

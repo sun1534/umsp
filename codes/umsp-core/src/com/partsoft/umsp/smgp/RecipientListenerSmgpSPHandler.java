@@ -33,13 +33,13 @@ public class RecipientListenerSmgpSPHandler extends AbstractSmgpSPTransmitHandle
 	protected void returnQueuedSubmits(List<Submit> submits) {}
 
 	@Override
-	protected List<Submit> takeQueuedSubmits() {
+	protected List<Submit> takeQueuedSubmits(int count) {
 		return null;
 	}
 
 	@Override
-	protected boolean testQueuedSubmits() {
-		return false;
+	protected int testQueuedSubmits() {
+		return 0;
 	}
 
 	@Override

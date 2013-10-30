@@ -4,29 +4,41 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.Date;
 import java.util.UUID;
 
 import com.partsoft.umsp.DataPacket;
 
 public abstract class AbstractDataPacket implements DataPacket, Serializable, Cloneable {
-	
+
 	private static final long serialVersionUID = 8243610090627927301L;
 
+	// 保留字符串1
 	public String srev1;
-	
+
+	// 保留字符串2
 	public String srev2;
-	
+
+	// 保留字符串3
 	public String srev3;
-	
+
+	// 保留字符串4
 	public String srev4;
-	
+
+	// 保留字符串5
 	public String srev5;
-	
+
+	// 保留数值1
 	public int irev1;
-	
+
+	// 保留数值2
 	public int irev2;
-	
+
+	// 保留数值3
 	public int irev3;
+
+	// 创建时间
+	public long createTimeMillis = System.currentTimeMillis();
 
 	protected String dataPacketId = UUID.randomUUID().toString();
 
@@ -107,13 +119,39 @@ public abstract class AbstractDataPacket implements DataPacket, Serializable, Cl
 		return "";
 	}
 
+	public long getCreateTimeMillis() {
+		return createTimeMillis;
+	}
+
+	public void setCreateTimeMillis(long createTimeMillis) {
+		this.createTimeMillis = createTimeMillis;
+	}
+
+	public Date getCreateTime() {
+		return new Date(getCreateTimeMillis());
+	}
+
+	public void setCreateTime(Date time) {
+		this.createTimeMillis = time.getTime();
+	}
+
 	public AbstractDataPacket clone() {
+		AbstractDataPacket dataPacket = null;
 		try {
-			AbstractDataPacket cloned = (AbstractDataPacket) super.clone();
-			return cloned;
+			dataPacket = (AbstractDataPacket) super.clone();
+			dataPacket.setCreateTimeMillis(System.currentTimeMillis());
 		} catch (CloneNotSupportedException e) {
 			throw new IllegalStateException(e);
 		}
+		return dataPacket;
+	}
+
+	public int compareTo(Object o) {
+		int result = -1;
+		if (o instanceof DataPacket) {
+			result = (int) (this.getCreateTimeMillis() - ((DataPacket) o).getCreateTimeMillis());
+		}
+		return result;
 	}
 
 }

@@ -3,7 +3,6 @@ package com.partsoft.umsp.cmpp;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.HashSet;
 
 import com.partsoft.umsp.Constants.MessageCodes;
@@ -15,9 +14,9 @@ import com.partsoft.utils.ListUtils;
 import com.partsoft.utils.StringUtils;
 
 public class Submit extends CmppDataPacket {
-	
+
 	private static final long serialVersionUID = 4L;
-	
+
 	public int nodeId; // nodeId 与 nodeTime 组合生成MsgId: 8 Unsigned Integer 信息标识。
 
 	public int nodeTime;// nodeId 与 nodeTime 组合生成MsgId: 8 Unsigned Integer 信息标识。
@@ -36,7 +35,7 @@ public class Submit extends CmppDataPacket {
 	public String serviceId; // 10 Octet String 业务标识，是数字、字母和符号的组合。
 
 	public byte feeUserType; // 1 Unsigned Integer 计费用户类型字段： 0：对目的终端MSISDN计费；
-								// 1：对源终端MSISDN计费； 
+								// 1：对源终端MSISDN计费；
 								// 2：对SP计费；
 								// 3：表示本字段无效，对谁计费参见Fee_terminal_Id字段。
 
@@ -58,7 +57,7 @@ public class Submit extends CmppDataPacket {
 	public String feeType; // 2 Octet String 资费类别： 01：对“计费用户号码”免费；
 							// 02：对“计费用户号码”按条计信息费； 03：对“计费用户号码”按包月收取信息费。
 
-	public String feeCode; // 6 Octet String 资费代码（以分为单位）。
+	public String feeCode; // 6 Octet String 资费代码(以分为单位)。
 
 	public String expireTime; // 17 Octet String 存活有效期，格式遵循SMPP3.3协议。
 
@@ -81,6 +80,9 @@ public class Submit extends CmppDataPacket {
 	public byte[] msgContent; // Msg_length Octet String 信息内容。
 
 	public String linkId; // 20 Octet String 点播业务使用的LinkID，非点播类业务的MT流程不使用该字段。
+
+	// 提交次数
+	public int submitCount;
 
 	public Submit() {
 		super(Commands.CMPP_SUBMIT);
@@ -247,7 +249,7 @@ public class Submit extends CmppDataPacket {
 			}
 		}
 	}
-	
+
 	public String getUserNumbersTrimCNPrefix() {
 		StringBuffer buffer = new StringBuffer(this.destUserCount * 21);
 		boolean appended = false;
@@ -306,7 +308,7 @@ public class Submit extends CmppDataPacket {
 		if (tp_udhi == 1 && (msgContent[1] == 0)) {
 			return UmspUtils.fromGsmBytes(msgContent, 6, msgLength - 6, msgFormat);
 		} else {
-			//TODO 还可能需要做更多的内容判断
+			// TODO 还可能需要做更多的内容判断
 			return UmspUtils.fromGsmBytes(msgContent, 0, msgLength, msgFormat);
 		}
 	}
@@ -332,7 +334,7 @@ public class Submit extends CmppDataPacket {
 		this.tp_udhi = 1;
 		this.pkNumber = (byte) index;
 		this.pkTotal = count;
-		this.msgFormat = (byte)messageCode;
+		this.msgFormat = (byte) messageCode;
 		this.msgLength = byte_buffer.length();
 		this.msgContent = byte_buffer.array();
 	}
@@ -344,16 +346,14 @@ public class Submit extends CmppDataPacket {
 
 	@Override
 	public String toString() {
-		return "Submit [nodeId=" + nodeId + ", nodeTime=" + nodeTime + ", nodeSeq=" + nodeSeq + ", pkTotal=" + pkTotal
-				+ ", pkNumber=" + pkNumber + ", registeredDelivery=" + registeredDelivery + ", msgLevel=" + msgLevel
-				+ ", serviceId=" + serviceId + ", feeUserType=" + feeUserType + ", feeTerminalId=" + feeTerminalId
-				+ ", feeTerminalType=" + feeTerminalType + ", tp_pid=" + tp_pid + ", tp_udhi=" + tp_udhi
-				+ ", msgFormat=" + msgFormat + ", spId=" + spId + ", feeType=" + feeType + ", feeCode=" + feeCode
-				+ ", expireTime=" + expireTime + ", atTime=" + atTime + ", sourceId=" + sourceId + ", destUserCount="
-				+ destUserCount + ", destTerminalIds=" + Arrays.toString(destTerminalIds) + ", destTerminalType="
-				+ destTerminalType + ", msgLength=" + msgLength + ", msgContent=" + Arrays.toString(msgContent)
-				+ ", linkId=" + linkId + ", commandId=" + commandId + ", sequenceId=" + sequenceId
-				+ ", getMessageContent()=" + getMessageContent() + "]";
+		return "移动CMPP短信提交包[节点号=" + nodeId + ", 节点时间=" + nodeTime + ", 节点序号=" + nodeSeq + ", 长短信拆分条目=" + pkTotal
+				+ ", 长短信标识=" + pkNumber + ", 是否需要报告=" + registeredDelivery + ", 消息优先级=" + msgLevel + ", 服务代码="
+				+ serviceId + ", 计费用户类型=" + feeUserType + ", 收费用户号码=" + feeTerminalId + ", 收费用户类型=" + feeTerminalType
+				+ ", 消息格式=" + msgFormat + ", 发送服务号码=" + spId + ", 计费类型=" + feeType + ", 计费代码=" + feeCode + ", 超时时间="
+				+ expireTime + ", 定时发送时间=" + atTime + ", 发送原号码=" + sourceId + ", 目标用户总计=" + destUserCount + ", 目标号码={"
+				+ getUserNumbers() + "}, 目标号码类型=" + destTerminalType + ", 短信长度=" + msgLength + ", 短信内容="
+				+ getMessageContent() + ", 业务唯一标识=" + linkId + ", TP_PID=" + tp_pid + ", TP_UDHI=" + tp_udhi + ", 序号="
+				+ sequenceId + ", 创建时间=" + createTimeMillis + ", 版本协议=" + protocolVersion + "]";
 	}
 
 }

@@ -106,7 +106,7 @@ public abstract class AbstractContextHandler extends AbstractHandler {
 	protected abstract void handleRequest(Request request, Response response) throws IOException;
 
 	protected void handleTimeout(Request request, Response response) throws IOException {
-		throw new PacketException("timeout");
+		throw new PacketException("请求超时");
 	}
 	
 	/**

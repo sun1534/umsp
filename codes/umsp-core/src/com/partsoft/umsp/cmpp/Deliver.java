@@ -3,13 +3,15 @@ package com.partsoft.umsp.cmpp;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.util.Arrays;
+
+import org.springframework.util.StringUtils;
 
 import com.partsoft.umsp.Constants.MessageCodes;
 import com.partsoft.umsp.Constants.SMS;
 import com.partsoft.umsp.cmpp.Constants.Commands;
 import com.partsoft.umsp.io.ByteArrayBuffer;
 import com.partsoft.umsp.utils.UmspUtils;
+import com.partsoft.utils.HexUtils;
 
 public class Deliver extends CmppDataPacket {
 
@@ -17,15 +19,15 @@ public class Deliver extends CmppDataPacket {
 
 	// Msg_Id 8 Unsigned Integer 信息标识。
 	// 生成算法如下：
-	// 采用64位（8字节）的整数：
-	// （1） 时间（格式为MMDDHHMMSS，即月日时分秒）：bit64~bit39，其中
+	// 采用64位(8字节)的整数：
+	// (1) 时间(格式为MMDDHHMMSS，即月日时分秒)：bit64~bit39，其中
 	// bit64~bit61：月份的二进制表示；
 	// bit60~bit56：日的二进制表示；
 	// bit55~bit51：小时的二进制表示；
 	// bit50~bit45：分的二进制表示；
 	// bit44~bit39：秒的二进制表示；
-	// （2） 短信网关代码：bit38~bit17，把短信网关的代码转换为整数填写到该字段中；
-	// （3） 序列号：bit16~bit1，顺序增加，步长为1，循环使用。
+	// (2) 短信网关代码：bit38~bit17，把短信网关的代码转换为整数填写到该字段中；
+	// (3) 序列号：bit16~bit1，顺序增加，步长为1，循环使用。
 	// 各部分如不能填满，左补零，右对齐。
 	public int nodeId;
 
@@ -47,7 +49,7 @@ public class Deliver extends CmppDataPacket {
 							// 4：二进制信息； 8：UCS2编码； 15：含GB汉字。
 
 	public String sourceId;// 32 Octet String
-							// 源终端MSISDN号码（状态报告时填为CMPP_SUBMIT消息的目的终端号码）。
+							// 源终端MSISDN号码(状态报告时填为CMPP_SUBMIT消息的目的终端号码)。
 
 	public byte sourceType;// 1 Unsigned Integer 源终端号码类型，0：真实号码；1：伪码。
 
@@ -59,6 +61,9 @@ public class Deliver extends CmppDataPacket {
 	public byte msgContent[];// Msg_length Octet String 消息内容。
 
 	public String linkId;// 20 Octet String 点播业务使用的LinkID，非点播类业务的MT流程不使用该字段。
+
+	// 提交次数
+	public int submitCount;
 
 	public Deliver() {
 		super(Commands.CMPP_DELIVER);
@@ -209,6 +214,14 @@ public class Deliver extends CmppDataPacket {
 		return result & 0xFF;
 	}
 
+	public String getSourceIdTrimCNPrefix() {
+		String result = this.sourceId;
+		if (StringUtils.hasText(this.sourceId) && this.sourceId.startsWith("86")) {
+			result = this.sourceId.substring(2);
+		}
+		return result;
+	}
+
 	@Override
 	public Deliver clone() {
 		return (Deliver) super.clone();
@@ -216,12 +229,12 @@ public class Deliver extends CmppDataPacket {
 
 	@Override
 	public String toString() {
-		return "Deliver [nodeId=" + nodeId + ", nodeTime=" + nodeTime + ", nodeSeq=" + nodeSeq + ", destId=" + destId
-				+ ", serviceId=" + serviceId + ", tp_pid=" + tp_pid + ", tp_udhi=" + tp_udhi + ", msgFormat="
-				+ msgFormat + ", sourceId=" + sourceId + ", sourceType=" + sourceType + ", registeredDelivery="
-				+ registeredDelivery + ", msgLength=" + msgLength + ", msgContent=" + Arrays.toString(msgContent)
-				+ ", linkId=" + linkId + ", commandId=" + commandId + ", sequenceId=" + sequenceId
-				+ ", protocolVersion=" + protocolVersion + "]";
+		return "移动上行数据包 [协议版本=" + this.protocolVersion + ", 来源节点=" + nodeId + ", 节点时间=" + nodeTime + ", 节点序号="
+				+ nodeSeq + ", 目标号码=" + destId + ", 服务代码=" + serviceId + ", 消息格式=" + msgFormat + ", 来源号码=" + sourceId
+				+ ", 来源类型=" + sourceType + ", 是否报告=" + registeredDelivery + ", 短信长度=" + msgLength + ", 数据内容={"
+				+ HexUtils.toHex(this.msgContent, msgLength) + "}, 业务唯一标识=" + linkId + ", TP_PID=" + tp_pid
+				+ ", TP_UDHI=" + tp_udhi + ", 序号=" + sequenceId + ", 创建时间=" + createTimeMillis + ", 版本协议="
+				+ protocolVersion + "]";
 	}
 
 }

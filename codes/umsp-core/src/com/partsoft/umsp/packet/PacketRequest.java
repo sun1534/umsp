@@ -131,12 +131,14 @@ public class PacketRequest implements Request {
 		}
 	}
 
+	@Deprecated
 	public int getContentLength() {
 		if (_connection == null || _connection.getParser() == null)
 			return -1;
 		return _connection.getParser().getContentLength();
 	}
 
+	@Deprecated
 	public int getContentReaded() {
 		if (_connection == null || _connection.getParser() == null)
 			return -1;

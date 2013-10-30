@@ -17,11 +17,11 @@ public class DeliverResponse extends SmgpDataPacket {
 	public int NodeSequenceId;
 	
 	//public String MsgID;// 10 Integer 网关产生的短消息流水号，由三部分组成：
-	// 网关代码：3字节（BCD码）
-	// 时间：4字节（BCD码）
-	// 序列号：3字节（BCD码）
+	// 网关代码：3字节(BCD码)
+	// 时间：4字节(BCD码)
+	// 序列号：3字节(BCD码)
 
-	public int Status;// 4 integer Deliver请求返回结果（参见错误代码表）
+	public int Status;// 4 integer Deliver请求返回结果(参见错误代码表)
 
 	public DeliverResponse() {
 		super(RequestIDs.deliver_resp);
@@ -58,10 +58,5 @@ public class DeliverResponse extends SmgpDataPacket {
 		return (DeliverResponse) super.clone();
 	}
 
-	@Override
-	public String toString() {
-		return "DeliverResponse [NodeId=" + NodeId + ", NodeTime=" + NodeTime + ", Status=" + Status + ", requestId="
-				+ requestId + ", sequenceId=" + sequenceId + "]";
-	}
 	
 }

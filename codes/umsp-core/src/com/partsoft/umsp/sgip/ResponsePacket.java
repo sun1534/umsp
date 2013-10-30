@@ -35,9 +35,9 @@ public class ResponsePacket extends SgipDataPacket {
 
 	@Override
 	public String toString() {
-		return this.getClass().getSimpleName() + " [result=" + result + ", reserve=" + reserve + "]";
+		return "联通SGIP应答数据包 [应答状态=" + result + "]";
 	}
-	
+
 	@Override
 	public int getDataSize() {
 		return PACKET_SIZE;
