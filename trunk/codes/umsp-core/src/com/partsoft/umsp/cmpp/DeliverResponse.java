@@ -7,13 +7,13 @@ import java.io.IOException;
 import com.partsoft.umsp.cmpp.Constants.Commands;
 
 public class DeliverResponse extends CmppDataPacket {
-	
+
 	private static final long serialVersionUID = 0x80000005L;
 
 	public int nodeId;
-	
+
 	public int nodeTime;
-	
+
 	public int nodeSeq;
 
 	public int result;
@@ -25,7 +25,7 @@ public class DeliverResponse extends CmppDataPacket {
 	public long getMsgId() {
 		return CmppUtils.generateMsgID(this.nodeId, this.nodeTime, this.nodeSeq);
 	}
-	
+
 	@Override
 	protected void writeDataOutput(DataOutput out) throws IOException {
 		super.writeDataOutput(out);
@@ -39,7 +39,7 @@ public class DeliverResponse extends CmppDataPacket {
 		long tmp_msgid = in.readLong();
 		this.nodeId = CmppUtils.extractNodeIdFromMsgID(tmp_msgid);
 		this.nodeTime = CmppUtils.extractNodeTimeFromMsgID(tmp_msgid);
-		this.nodeSeq  = CmppUtils.extractNodeSeqFromMsgID(tmp_msgid);
+		this.nodeSeq = CmppUtils.extractNodeSeqFromMsgID(tmp_msgid);
 		this.result = in.readInt();
 	}
 
@@ -55,9 +55,8 @@ public class DeliverResponse extends CmppDataPacket {
 
 	@Override
 	public String toString() {
-		return "DeliverResponse [nodeId=" + nodeId + ", nodeTime=" + nodeTime + ", result=" + result + ", commandId="
-				+ commandId + ", sequenceId=" + sequenceId + ", createTimeMillis=" + createTimeMillis
-				+ ", protocolVersion=" + protocolVersion + ", getMsgId()=" + getMsgId() + "]";
+		return "移动CMPP上行应答包 [发送节点号=" + nodeId + ", 节点时间=" + nodeTime + ", 应答状态=" + result + ", 序号=" + sequenceId
+				+ ", createTimeMillis=" + createTimeMillis + ", 协议版本=" + protocolVersion + "]";
 	}
 
 }

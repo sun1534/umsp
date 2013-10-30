@@ -9,6 +9,10 @@ public interface FilterableBatchPool<T extends Serializable> extends BatchPool<T
 	
 	List<T> takeObjects(int maxLength, Object filter);
 	
+	@Deprecated
 	boolean isPooling(Object filter);
+	
+	
+	int countPooling(int maxLength, Object filter);
 	
 }

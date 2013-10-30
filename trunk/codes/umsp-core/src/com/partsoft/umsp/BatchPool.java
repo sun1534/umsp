@@ -14,5 +14,8 @@ public interface BatchPool<T extends Serializable> {
 	
 	List<T> takeObjects(int maxLength);
 	
+	@Deprecated
 	boolean isPooling();
+	
+	int countPooling(int maxLength);
 }

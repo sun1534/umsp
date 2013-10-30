@@ -9,6 +9,7 @@ import com.partsoft.umsp.Request;
 import com.partsoft.umsp.Response;
 import com.partsoft.umsp.handler.AbstractContextHandler;
 import com.partsoft.umsp.io.Buffer;
+import com.partsoft.umsp.io.ByteArrayBuffer;
 import com.partsoft.umsp.log.Log;
 import com.partsoft.umsp.packet.PacketException;
 import com.partsoft.umsp.packet.PacketInputStream;
@@ -38,6 +39,20 @@ public abstract class AbstractSmgpContextHandler extends AbstractContextHandler 
 
 	protected Map<Integer, SmgpDataPacket> context_smgp_packet_maps;
 
+	//收到错误命令是否抛出异常
+	protected boolean errorCommandException = false;
+
+	//包提交重试次数
+	protected int packetSubmitRetryTimes = 3;
+	
+	public void setPacketSubmitRetryTimes(int packetSubmitRetryTimes) {
+		this.packetSubmitRetryTimes = packetSubmitRetryTimes;
+	}
+	
+	public void setErrorCommandException(boolean errorCommandException) {
+		this.errorCommandException = errorCommandException;
+	}
+
 	protected static void addSmgpCommands(SmgpDataPacket packet) {
 		smgp_packet_maps.put(packet.getRequestId(), packet);
 	}
@@ -45,6 +60,7 @@ public abstract class AbstractSmgpContextHandler extends AbstractContextHandler 
 	@Override
 	protected void doStart() throws Exception {
 		super.doStart();
+		Assert.isTrue(packetSubmitRetryTimes >= 1, "包重复提交次数必须大于等于1次");
 		context_smgp_packet_maps = new HashMap<Integer, SmgpDataPacket>(smgp_packet_maps);
 	}
 
@@ -69,8 +85,8 @@ public abstract class AbstractSmgpContextHandler extends AbstractContextHandler 
 	protected void doActiveTest(Request request, Response response) throws IOException {
 		Assert.isTrue(SmgpUtils.testRequestBinded(request));
 		ActiveTest active_test = (ActiveTest) SmgpUtils.extractRequestPacket(request);
-		ActiveTestResponse test_response = ((ActiveTestResponse) this.context_smgp_packet_maps.get(RequestIDs.active_test_resp))
-				.clone();
+		ActiveTestResponse test_response = ((ActiveTestResponse) this.context_smgp_packet_maps
+				.get(RequestIDs.active_test_resp)).clone();
 		test_response.sequenceId = active_test.sequenceId;
 		SmgpUtils.renderDataPacket(request, response, test_response);
 		response.flushBuffer();
@@ -131,7 +147,7 @@ public abstract class AbstractSmgpContextHandler extends AbstractContextHandler 
 		super.handleConnect(request, response);
 		doRequestStart(request, response);
 	}
-	
+
 	@Override
 	protected void handleDisConnect(Request request, Response response) {
 		SmgpUtils.cleanRequestAttributes(request);
@@ -143,9 +159,7 @@ public abstract class AbstractSmgpContextHandler extends AbstractContextHandler 
 		try {
 			SmgpUtils.cleanRequestActiveTesting(request);
 			SmgpDataPacket packet = readPacketObject(SmgpUtils.extractRequestPacketStream(request));
-			if (Log.isDebugEnabled()) {
-				Log.debug(String.format("packet: %s", packet.toString()));
-			}
+			if (packet == null) return;
 			SmgpUtils.setupRequestPacket(request, packet);
 			switch (packet.requestId) {
 			case RequestIDs.login:
@@ -198,8 +212,24 @@ public abstract class AbstractSmgpContextHandler extends AbstractContextHandler 
 				packet = packet.clone();
 				packet.readExternal(in);
 				result = packet;
-			} else
-				throw new IOException(String.format("not found command: %d", command));
+			} else {
+				IOException errException = new IOException(String.format("收到网关错误的指令: %d", command));
+				int dataCount = in.available();
+				ByteArrayBuffer buffer = new ByteArrayBuffer(dataCount);
+				try {
+					int readedCount = buffer.readFrom(in, dataCount);
+					Log.warn(String.format("收到网关错误的数据包(%d字节)\n%s\n", readedCount, buffer.toAllDetailString()));
+				} catch (Throwable e) {
+					Log.error(
+							String.format("读取并打印网关错误指令包失败: %s\n，已读取到的内容: %s ", e.getMessage(),
+									buffer.toAllDetailString()), e);
+				}
+				if (this.errorCommandException) {
+					throw errException;
+				} else {
+					Log.warn(String.format("忽略错误(%s)", errException.getMessage()), errException);
+				}
+			}
 		} catch (IOException e) {
 			Log.error(e.getMessage(), e);
 			throw new PacketException(e);

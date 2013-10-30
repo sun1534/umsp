@@ -57,14 +57,14 @@ public class StreamEndPoint implements EndPoint {
 		if (space <= 0 || space < size) {
 			if (buffer.hasContent())
 				return 0;
-			throw new IOException(String.format("size is too large: %d", size));
+			throw new IOException(String.format("预读数据(%d字节)大于缓冲区可用内存(%d字节)", size, space));
 		} else if (space > size) {
 			space = size;
 		}
 		int len = buffer.readFrom(_in, space);
 		return len;
 	}
-	
+
 	public int fill(Buffer buffer) throws IOException {
 		if (_in == null)
 			return 0;
@@ -73,7 +73,7 @@ public class StreamEndPoint implements EndPoint {
 		if (space <= 0) {
 			if (buffer.hasContent())
 				return 0;
-			throw new IOException("FULL");
+			throw new IOException("缓冲区无可用内存");
 		}
 		int len = buffer.readFrom(_in, space);
 		return len;

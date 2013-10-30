@@ -3,7 +3,6 @@ package com.partsoft.umsp.sgip;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.HashSet;
 
 import com.partsoft.umsp.io.ByteArrayBuffer;
@@ -67,6 +66,9 @@ public class Submit extends SgipDataPacket {
 	public int message_length;
 
 	public byte[] message_content;
+
+	// 提交次数
+	public int submitCount;
 
 	public Submit() {
 		super(Commands.SUBMIT);
@@ -186,7 +188,7 @@ public class Submit extends SgipDataPacket {
 	public void setMessageContent(String msg) {
 		setMessageContent(msg, MessageCodes.UCS2);
 	}
-	
+
 	public String getUserNumbersTrimCNPrefix() {
 		StringBuffer buffer = new StringBuffer(this.user_count * 21);
 		boolean appended = false;
@@ -270,15 +272,11 @@ public class Submit extends SgipDataPacket {
 
 	@Override
 	public String toString() {
-		return "SGIPSubmit [sp_number=" + sp_number + ", charge_number=" + charge_number + ", user_count=" + user_count
-				+ ", user_number=" + Arrays.toString(user_number) + ", corporation_id=" + corporation_id
-				+ ", service_type=" + service_type + ", fee_type=" + fee_type + ", fee_value=" + fee_value
-				+ ", given_value=" + given_value + ", priority=" + priority + ", agent_flag=" + agent_flag
-				+ ", mo_relate_to_mt_flag=" + mo_relate_to_mt_flag + ", expire_time=" + expire_time
-				+ ", schedule_time=" + schedule_time + ", report_flag=" + report_flag + ", tp_pid=" + tp_pid
-				+ ", tp_udhi=" + tp_udhi + ", message_coding=" + message_coding + ", message_type=" + message_type
-				+ ", message_length=" + message_length + ", message_content=" + Arrays.toString(message_content)
-				+ ", reserve=" + reserve + "]";
+		return "联通SGIP短信提交包 [发送号码=" + sp_number + ", 计费号码=" + charge_number + ", 目标号码数=" + user_count + ", 目标号码="
+				+ getUserNumbers() + ", 企业号=" + corporation_id + ", 服务类型=" + service_type + ", 计费类型=" + fee_type
+				+ ", 计费值=" + fee_value + ", 报告标志=" + report_flag + ", TP_PID=" + tp_pid + ", TP_UDHI=" + tp_udhi
+				+ ", 消息编码=" + message_coding + ", 消息类型=" + message_type + ", 消息长度=" + message_length + ", 消息内容="
+				+ getMessageContent() + "]";
 	}
 
 }

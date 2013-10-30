@@ -20,8 +20,6 @@ public abstract class SgipDataPacket extends AbstractDataPacket implements DataP
 
 	protected final int command;
 
-	public long createTimeMillis = System.currentTimeMillis();
-
 	// 3个4位长度的序列号，由node_id， 时间戳，顺序号组成
 	public int node_id;
 
@@ -64,7 +62,6 @@ public abstract class SgipDataPacket extends AbstractDataPacket implements DataP
 	@Override
 	public SgipDataPacket clone() {
 		SgipDataPacket new_obj = (SgipDataPacket) super.clone();
-		new_obj.createTimeMillis = System.currentTimeMillis();
 		return new_obj;
 	}
 
@@ -107,18 +104,14 @@ public abstract class SgipDataPacket extends AbstractDataPacket implements DataP
 	public String getId() {
 		return HexUtils.toHex(node_id) + "-" + HexUtils.toHex(timestamp) + "-" + HexUtils.toHex(sequence);
 	}
+	
+	public int getCommandID() {
+		return this.command;
+	}
 
 	@Override
 	public String toString() {
-		return "SGIPPacket [command=" + command + ", node_id=" + node_id + ", timestamp=" + timestamp + ", sequence="
-				+ sequence + "]";
-	}
-	public int compareTo(Object o) {
-		int result = -1;
-		if (o instanceof SgipDataPacket) {
-			result = (int) (this.createTimeMillis - ((SgipDataPacket)o).createTimeMillis);
-		}
-		return result ;
+		return "联通SGIP协议包 [指令=" + command + ", 节点号=" + node_id + ", 时间戳=" + timestamp + ", 序号=" + sequence + "]";
 	}
 
 }

@@ -17,11 +17,11 @@ public class SubmitResponse extends SmgpDataPacket {
 	
 	public int NodeSequenceId;
 	
-	// 网关代码：3字节（BCD码）
-	// 时间：4字节（BCD码）
-	// 序列号：3字节（BCD码）
+	// 网关代码：3字节(BCD码)
+	// 时间：4字节(BCD码)
+	// 序列号：3字节(BCD码)
 
-	public int Status;// 4 Integer Submit请求返回结果（参见错误代码表）
+	public int Status;// 4 Integer Submit请求返回结果(参见错误代码表)
 
 	public SubmitResponse() {
 		super(RequestIDs.submit_resp);
@@ -84,11 +84,6 @@ public class SubmitResponse extends SmgpDataPacket {
 
 	public void setStatus(int status) {
 		Status = status;
-	}
-
-	@Override
-	public String toString() {
-		return "SubmitResponse [Status=" + Status + ", NodeId=" + NodeId + ", NodeTime=" + NodeTime + "]";
 	}
 
 }

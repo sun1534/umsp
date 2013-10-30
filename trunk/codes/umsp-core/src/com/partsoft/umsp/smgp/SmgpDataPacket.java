@@ -3,15 +3,15 @@ package com.partsoft.umsp.smgp;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.util.Date;
 
 import com.partsoft.umsp.DataPacket;
 import com.partsoft.umsp.io.Buffer;
-import com.partsoft.umsp.log.Log;
 import com.partsoft.umsp.packet.AbstractDataPacket;
 import com.partsoft.utils.Assert;
 
 public abstract class SmgpDataPacket extends AbstractDataPacket implements DataPacket, Cloneable {
-	
+
 	private static final long serialVersionUID = 6148118459292364553L;
 
 	protected static final int PACKET_HEADER_SIZE = 8;
@@ -37,9 +37,6 @@ public abstract class SmgpDataPacket extends AbstractDataPacket implements DataP
 			new IOException();
 		out.writeInt(requestId);
 		out.writeInt(sequenceId);
-		if (Log.isDebugEnabled()) {
-			Log.debug(String.format("%s writeDataOut()%s", getClass().getName(), this.toString()));
-		}
 	}
 
 	protected void readDataInput(DataInput in) throws IOException {
@@ -58,24 +55,27 @@ public abstract class SmgpDataPacket extends AbstractDataPacket implements DataP
 		return getDataSize() + Buffer.INT_SIZE;
 	}
 
+	public long getCreateTimeMillis() {
+		return createTimeMillis;
+	}
+
+	public Date getCreateTime() {
+		return new Date(getCreateTimeMillis());
+	}
+
 	public SmgpDataPacket clone() {
 		SmgpDataPacket new_obj = (SmgpDataPacket) super.clone();
 		new_obj.createTimeMillis = System.currentTimeMillis();
 		return new_obj;
 	}
+	
+	public int getCommandID() {
+		return this.requestId;
+	}
 
 	@Override
 	public String toString() {
-		return getClass().getSimpleName() +" [requestId=" + requestId + ", sequenceId=" + sequenceId + ", createTimeMillis="
-				+ createTimeMillis + ", enabled=" + enabled + "]";
-	}
-	
-	public int compareTo(Object o) {
-		int result = -1;
-		if (o instanceof SmgpDataPacket) {
-			result = (int) (this.createTimeMillis - ((SmgpDataPacket)o).createTimeMillis);
-		}
-		return result ;
+		return "电信SMGP协议包 [指令=" + requestId + ", 序号=" + sequenceId + ", 创建时间=" + getCreateTimeMillis() + "]";
 	}
 
 }

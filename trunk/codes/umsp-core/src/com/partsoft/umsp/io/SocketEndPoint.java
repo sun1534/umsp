@@ -82,7 +82,7 @@ public class SocketEndPoint extends StreamEndPoint {
 
 	@Override
 	public String toString() {
-		return "SocketEndPoint [local=" + _local + ", remote=" + _remote + "]";
+		return "套接字 [本地=" + _local + ", 远程=" + _remote + "]";
 	}
 
 }

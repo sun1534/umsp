@@ -4,10 +4,12 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
+import org.springframework.util.StringUtils;
+
 import com.partsoft.umsp.sgip.Constants.Commands;
 
-public class Report extends SgipDataPacket {
-	
+public class Report extends MoForwardPacket {
+
 	private static final long serialVersionUID = 5L;
 
 	public int submit_node_id;
@@ -60,19 +62,25 @@ public class Report extends SgipDataPacket {
 	public Report clone() {
 		return (Report) super.clone();
 	}
-	
+
 	@Override
 	public int getDataSize() {
 		return super.getDataSize() + 36;
 	}
 
+	public String getUserNumberTrimCNPrefix() {
+		String result = this.user_number;
+		if (StringUtils.hasText(this.user_number) && this.user_number.startsWith("86")) {
+			result = this.user_number.substring(2);
+		}
+		return result;
+	}
+
 	@Override
 	public String toString() {
-		return "SGIPReport [command=" + command + ", node_id=" + node_id + ", timestamp=" + timestamp + ", sequence="
-				+ sequence + ", submit_node_id=" + submit_node_id + ", submit_time_stamp=" + submit_time_stamp
-				+ ", submit_sequence_id=" + submit_sequence_id + ", report_type=" + report_type + ", user_number="
-				+ user_number + ", state=" + state + ", error_code=" + error_code + ", reserve=" + reserve
-				+ ", sp_number=" + sp_number + "]";
+		return "联通SGIP短信发送报告数据 [节点号=" + node_id + ", 时间戳=" + timestamp + ", 序号=" + sequence + ", 提交节点号=" + submit_node_id
+				+ ", 提交时间戳=" + submit_time_stamp + ", 提交序号=" + submit_sequence_id + ", 报告类型=" + report_type + ", 下发号码="
+				+ user_number + ", 状态=" + state + ", 错误代码=" + error_code + ", 发送号码=" + sp_number + "]";
 	}
 
 }

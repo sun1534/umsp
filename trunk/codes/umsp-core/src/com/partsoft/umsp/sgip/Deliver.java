@@ -3,14 +3,17 @@ package com.partsoft.umsp.sgip;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.util.Arrays;
+
+import org.springframework.util.StringUtils;
 
 import com.partsoft.umsp.Constants.MessageCodes;
+import com.partsoft.umsp.Constants.SMS;
+import com.partsoft.umsp.io.ByteArrayBuffer;
 import com.partsoft.umsp.sgip.Constants.Commands;
 import com.partsoft.umsp.utils.UmspUtils;
 
-public class Deliver extends SgipDataPacket {
-	
+public class Deliver extends MoForwardPacket {
+
 	private static final long serialVersionUID = 4L;
 
 	public String user_number;
@@ -66,6 +69,14 @@ public class Deliver extends SgipDataPacket {
 		return PACKET_SIZE + message_length + 49;
 	}
 
+	public String getUserNumberTrimCNPrefix() {
+		String result = this.user_number;
+		if (StringUtils.hasText(this.user_number) && this.user_number.startsWith("86")) {
+			result = this.user_number.substring(2);
+		}
+		return result;
+	}
+
 	public String getMessageContent() {
 		return tp_udhi == 1 ? UmspUtils.fromGsmBytes(message_content, 6, message_length - 6, message_coding)
 				: UmspUtils.fromGsmBytes(message_content, message_coding);
@@ -81,7 +92,7 @@ public class Deliver extends SgipDataPacket {
 		tp_udhi = 0;
 		message_length = message_content == null ? 0 : message_content.length;
 	}
-	
+
 	public int getMessageCascadeCount() {
 		byte result = 0;
 		if (this.tp_udhi == 1) {
@@ -89,7 +100,7 @@ public class Deliver extends SgipDataPacket {
 		}
 		return result & 0xFF;
 	}
-	
+
 	public int getMessageCascadeRefId() {
 		byte result = 0;
 		if (this.tp_udhi == 1) {
@@ -106,12 +117,35 @@ public class Deliver extends SgipDataPacket {
 		return result & 0xFF;
 	}
 
+	public void setCascadeMessageContent(String msg, int refid, int count, int index) {
+		setCascadeMessageContent(msg, MessageCodes.UCS2, refid, count, index);
+	}
+
+	public void setCascadeMessageContent(String msg, int messageCode, int refid, int count, int index) {
+		if (msg.length() > SMS.MAX_SMS_CASCADEMSG_CONTENT) {
+			throw new IllegalArgumentException(String.format("cascade message length must be less than or equals %d",
+					SMS.MAX_SMS_CASCADEMSG_CONTENT));
+		}
+		byte[] msg_content = UmspUtils.toGsmBytes(msg, messageCode);
+		ByteArrayBuffer byte_buffer = new ByteArrayBuffer(msg_content.length + 6);
+		byte_buffer.put((byte) 5);
+		byte_buffer.put((byte) 0);
+		byte_buffer.put((byte) 3);
+		byte_buffer.put((byte) refid);
+		byte_buffer.put((byte) count);
+		byte_buffer.put((byte) index);
+		byte_buffer.put(msg_content);
+		this.tp_udhi = 1;
+		this.message_coding = (byte) messageCode;
+		this.message_length = byte_buffer.length();
+		this.message_content = byte_buffer.array();
+	}
+
 	@Override
 	public String toString() {
-		return "SGIPDeliver [command=" + command + ", node_id=" + node_id + ", timestamp=" + timestamp + ", sequence="
-				+ sequence + ", user_number=" + user_number + ", sp_number=" + sp_number + ", tp_pid=" + tp_pid
-				+ ", tp_udhi=" + tp_udhi + ", message_coding=" + message_coding + ", message_length=" + message_length
-				+ ", message_content=" + Arrays.toString(message_content) + ", reserve=" + reserve + "]";
+		return "联通SGIP短信上行数据包 [节点号=" + node_id + ", 时间戳=" + timestamp + ", 序号=" + sequence + ", 来源号码=" + user_number
+				+ ", 目标号码=" + sp_number + ", TP_PID=" + tp_pid + ", TP_UDHI=" + tp_udhi + ", 消息格式=" + message_coding
+				+ ", 消息长度=" + message_length + ", 消息内容=" + getMessageContent() + "]";
 	}
 
 }

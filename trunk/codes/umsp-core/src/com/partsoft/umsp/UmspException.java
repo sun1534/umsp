@@ -1,17 +1,24 @@
 package com.partsoft.umsp;
 
-public class UmspException extends RuntimeException {
+import java.io.Serializable;
+
+public class UmspException extends RuntimeException implements Serializable {
 
 	private static final long serialVersionUID = -6879583987345986122L;
 	
-	private String errorCode;
+	private int errorCode = -1;
 
 	public UmspException(String reason) {
 		super(reason);
 	}
 
-	public UmspException(String reason, String errorCode) {
+	public UmspException(int errorCode, String reason) {
 		super(reason);
+		this.errorCode = errorCode;
+	}
+	
+	public UmspException(int errorCode, Throwable e) {
+		super(e);
 		this.errorCode = errorCode;
 	}
 	
@@ -21,12 +28,10 @@ public class UmspException extends RuntimeException {
 	
 	public UmspException() {
 		super();
-		this.errorCode = "UNKNOWN";
 	}
 
 	public UmspException(Throwable cause) {
 		super(cause);
-		this.errorCode = "UNKNOWN";
 	}
 
 	public void finalize() {
@@ -35,10 +40,9 @@ public class UmspException extends RuntimeException {
 		} catch (Throwable e) {
 			
 		}
-		errorCode = null;
 	}
 
-	public String getErrorCode() {
+	public int getErrorCode() {
 		return errorCode;
 	}
 

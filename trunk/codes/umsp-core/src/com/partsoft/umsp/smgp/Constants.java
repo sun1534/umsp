@@ -20,7 +20,7 @@ public class Constants {
 
 		public static final int deliver_resp = 0x80000003; // SMGW向CP发送短消息回应
 
-		public static final int active_test = 0x00000004; // 测试通信链路是否正常请求（由客户端发起，CP和SMGW可以通过定时发送此请求来维持连接）
+		public static final int active_test = 0x00000004; // 测试通信链路是否正常请求(由客户端发起，CP和SMGW可以通过定时发送此请求来维持连接)
 
 		public static final int active_test_resp = 0x80000004; // 测试通信链路是否正常回应
 
@@ -48,11 +48,11 @@ public class Constants {
 	
 	public static final class LoginModes {
 		
-		public static final int SEND = 0;//发送模式（send mode）
+		public static final int SEND = 0;//发送模式(send mode)
 		
-		public static final int RECEIVE = 1; //接收模式（receive mode）
+		public static final int RECEIVE = 1; //接收模式(receive mode)
 		
-		public static final int TRANSMIT = 2; //收发模式（transmit mode）。
+		public static final int TRANSMIT = 2; //收发模式(transmit mode)。
 		
 	}
 
@@ -76,23 +76,23 @@ public class Constants {
 		
 		public static final int ERR_VERSION = 22;// 版本太高
 
-		public static final int ERR_MSGTYPE = 30;// 非法消息类型（SMType）
+		public static final int ERR_MSGTYPE = 30;// 非法消息类型(SMType)
 
-		public static final int ERR_MSGPRIO = 31;// 非法优先级（Priority）
+		public static final int ERR_MSGPRIO = 31;// 非法优先级(Priority)
 
-		public static final int ERR_FEETYPE = 32;// 非法资费类型（FeeType）
+		public static final int ERR_FEETYPE = 32;// 非法资费类型(FeeType)
 
-		public static final int ERR_FEECODE = 33;// 非法资费代码（FeeCode）
+		public static final int ERR_FEECODE = 33;// 非法资费代码(FeeCode)
 
-		public static final int ERR_MSGFORMAT = 34;// 非法短消息格式（MsgFormat）
+		public static final int ERR_MSGFORMAT = 34;// 非法短消息格式(MsgFormat)
 
 		public static final int ERR_TIMEFORMAT = 35;// 非法时间格式
 
-		public static final int ERR_MSGLEN = 36;// 非法短消息长度（MsgLength）
+		public static final int ERR_MSGLEN = 36;// 非法短消息长度(MsgLength)
 
 		public static final int ERR_EXPIRED = 37;// 有效期已过
 
-		public static final int ERR_QUERY = 38;// 非法查询类别（QueryType）
+		public static final int ERR_QUERY = 38;// 非法查询类别(QueryType)
 
 		public static final int ERR_ROUTE = 39;// 路由错误
 		

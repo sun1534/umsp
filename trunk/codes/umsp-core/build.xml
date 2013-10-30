@@ -7,6 +7,9 @@
 		-->
 	</path>
 	<path id="project.test.depends">
+	    <pathelement location="${jits.sdk.dir}/libs/external/testng.jar"/>
+	    <pathelement location="${jits.sdk.dir}/libs/external/junit.jar"/>
+	    <pathelement location="${jits.sdk.dir}/libs/external/jcommander.jar"/>
 	</path>
 	<import file="${jits.sdk.dir}/settings/ant/build.xml" />
 </project>

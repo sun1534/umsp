@@ -11,8 +11,8 @@ import com.partsoft.umsp.EndPoint;
 import com.partsoft.umsp.Generator;
 import com.partsoft.umsp.Handler;
 import com.partsoft.umsp.OriginHandler;
+import com.partsoft.umsp.io.Buffer;
 import com.partsoft.umsp.io.BufferPools;
-import com.partsoft.umsp.io.ByteArrayBuffer;
 import com.partsoft.umsp.io.EofException;
 import com.partsoft.umsp.log.Log;
 import com.partsoft.umsp.packet.PacketParser.Input;
@@ -75,12 +75,18 @@ public class PacketConnection implements Connection {
 	}
 
 	public void reset(boolean returnBuffers) {
-		_parser.reset(returnBuffers); // TODO maybe only release when low on
-		_generator.reset(returnBuffers); // TODO maybe only release when low on
+		_parser.reset(returnBuffers);
+		_generator.reset(returnBuffers);
 		_request.recycle();
 		_response.recycle();
 	}
-
+	
+	protected void resetOut() {
+		_generator.reset(false);
+		_request.recycle();
+		_response.recycle();
+	}
+	
 	public long getConnectTimestamp() {
 		return _connectTimestamp;
 	}
@@ -102,142 +108,106 @@ public class PacketConnection implements Connection {
 
 	public void handle() throws IOException {
 
-		if (Log.isDebugEnabled()) {
-			Log.debug(String.format("start packet connection handle"));
-		}
+		boolean more_in_buffer = true;
+		boolean dis_connect = false;
+		int no_progress = 0;
 
-		try {
-			boolean more_in_buffer = true;
-			boolean dis_connect = false;
-			int no_progress = 0;
-			if (Log.isDebugEnabled()) {
-				Log.debug(String.format("do receive request packet data"));
-			}
-			while (more_in_buffer) {
-				try {
-					if (Log.isDebugEnabled() && no_progress > 0) {
-						Log.debug("continue receive last request data packet");
+		while (more_in_buffer) {
+			try {
+				synchronized (this) {
+					_handling = true;
+				}
+				setCurrentConnection(this);
+				long io = 0;
+				if (!_parser.isComplete()) {
+					if (_requests <= 0) {
+						// 第一次请求激发连接事件
+						handleConnect();
+						reset(false);
+						_requests++;
+						continue;
+					} else {
+						// 读取数据包
+						io = _parser.parseAvailable();
 					}
-					synchronized (this) {
-						if (_handling)
-							throw new IllegalStateException();
-						_handling = true;
-					}
-					setCurrentConnection(this);
-					// 连接第一次请求
-					long io = 0;
-					if (!_parser.isComplete()) {
-						if (Log.isDebugEnabled() && no_progress > 0) {
-							Log.debug(String.format("last request data packet not complete to be continue"));
-						}
-						if (_requests <= 0) {
-							handleConnect();
-							reset(false);
-							_requests++;
-							continue;
-						} else {
-							io = _parser.parseAvailable();
-						}
-					} else if (Log.isDebugEnabled()) {
-						Log.debug(String.format("request data packet was complete"));
-					}
+				}
 
-					boolean g_commited = _generator.isCommitted();
-					boolean g_complete = _generator.isComplete();
+				boolean g_commited = _generator.isCommitted();
+				boolean g_complete = _generator.isComplete();
 
-					while (g_commited && !g_complete) {
-						if (Log.isDebugEnabled()) {
-							Log.debug(String.format(
-									"last response data packet is not flush, state (commited=%s;complete=%s) ",
-									Boolean.toString(g_commited), Boolean.toString(g_complete)));
-						}
-						long written = _generator.flush();
-						io += written;
-						if (written <= 0)
-							break;
-						if (_endp.isBufferingOutput())
-							_endp.flush();
-					}
-
+				while (g_commited && !g_complete) {
+					long written = _generator.flush();
+					io += written;
+					if (written <= 0)
+						break;
 					if (_endp.isBufferingOutput()) {
 						_endp.flush();
-						if (!_endp.isBufferingOutput())
-							no_progress = 0;
 					}
-					if (io > 0)
-						no_progress = 0;
-					else if (no_progress++ >= 2)
-						return;
-				} catch (IOException e) {
-					if (e instanceof SocketTimeoutException || e.getCause() instanceof SocketTimeoutException
-							&& _parser.isIdle()) {
-						reset(false);
-						handleTimeout();
-						reset(false);
-					} else {
-						reset(true);
-						_endp.close();
-						dis_connect = true;
-						handleDisConnect();
-						throw e;
-					}
-				} finally {
-					if (!_endp.isOpen()) {
-						more_in_buffer = false;
-						if (dis_connect == false) {
-							dis_connect = true;
-							handleDisConnect();
-						}
-					}
+				}
 
-					setCurrentConnection(null);
-					if (Log.isDebugEnabled()) {
-						Log.debug("check to see if there more bytes of request data packet?");
-					}
-
-					more_in_buffer = more_in_buffer ? _parser.isMoreInBuffer() || _endp.isBufferingInput()
-							: more_in_buffer;
-
-					synchronized (this) {
-						_handling = false;
-						if (_destroy) {
-							if (Log.isDebugEnabled()) {
-								Log.debug("return by connection has destoried");
-							}
-							destroy();
-							return;
-						}
-					}
-
-					boolean parser_complete = _parser.isComplete();
-					boolean generator_complete = _generator.isComplete();
-					if (Log.isDebugEnabled()) {
-						Log.debug("check to see if complete packet parse and complete response?");
-					}
-					if (parser_complete && generator_complete && !_endp.isBufferingOutput()) {
-						if (!_generator.isPersistent()) {
-							if (Log.isDebugEnabled()) {
-								Log.debug("not have next response data, reset packet parser");
-							}
-							_parser.reset(true);
-							more_in_buffer = false;
-						}
-						if (more_in_buffer) {
-							reset(false);
-							more_in_buffer = _parser.isMoreInBuffer() || _endp.isBufferingInput();
-						} else {
-//							_request.updateRequestTime(-1);
-							reset(true);
-						}
+				if (_endp.isBufferingOutput()) {
+					_endp.flush();
+					if (!_endp.isBufferingOutput()) {
 						no_progress = 0;
 					}
 				}
-			}
-		} finally {
-			if (Log.isDebugEnabled()) {
-				Log.debug("end packet connect handle");
+				if (io > 0) {
+					no_progress = 0;
+				} else if (no_progress++ >= 2) {
+					return;
+				}
+			} catch (IOException e) {
+				if (e instanceof SocketTimeoutException || e.getCause() instanceof SocketTimeoutException) {
+					handleTimeout();
+					resetOut();
+				} else {
+					_endp.close();
+					throw e;
+				}
+			} catch (Throwable e) {
+				_endp.close();
+				throw new IOException(String.format("连接处理错误: %s", e.getMessage()), e);
+			} finally {
+				if (!_endp.isOpen()) {
+					reset(true);
+					more_in_buffer = false;
+					if (dis_connect == false) {
+						dis_connect = true;
+						handleDisConnect();
+					}
+				}
+
+				setCurrentConnection(null);
+
+				// 检查连接是否还有数据
+				more_in_buffer = more_in_buffer ? _parser.isMoreInBuffer() || _endp.isBufferingInput() : more_in_buffer;
+
+				synchronized (this) {
+					_handling = false;
+					if (_destroy) {
+						if (dis_connect == false) {
+							reset(true);
+							handleDisConnect();
+						}
+						destroy();
+						return;
+					}
+				}
+
+				boolean parser_complete = _parser.isComplete();
+				boolean generator_complete = _generator.isComplete();
+
+				if (parser_complete && generator_complete && !_endp.isBufferingOutput()) {
+					more_in_buffer = false;
+					if (!_generator.isPersistent()) {
+						_parser.reset(true);
+					} else {
+						reset(false);
+					}
+				}
 			}
 		}
+
 	}
 
 	protected void handleTimeout() throws IOException {
@@ -249,7 +219,7 @@ public class PacketConnection implements Connection {
 				_connector.customize(_endp, _request);
 				_handler.handle(this, Handler.TIMEOUT);
 				_request.setHandled(true);
-			}  catch (IOException e) {
+			} catch (IOException e) {
 				_request.setHandled(true);
 				error = true;
 				throw e;
@@ -291,7 +261,6 @@ public class PacketConnection implements Connection {
 			} catch (Throwable e) {
 				if (e instanceof ThreadDeath)
 					throw (ThreadDeath) e;
-				Log.error(e.getMessage(), e);
 				error = true;
 				throw new IOException(e);
 			} finally {
@@ -301,11 +270,8 @@ public class PacketConnection implements Connection {
 					if (error)
 						_endp.close();
 					else if (!_response.isCommitted() && !_request.isHandled()) {
-						if (Log.isDebugEnabled()) {
-							Log.debug(String.format("not found \"%s\" protocol handler for %s",
-									_connector.getProtocol(), _connector.getName()));
-						}
 						_response.errorTerminated();
+						throw new IllegalStateException(String.format(String.format("协议(%s)请求未能被处理", getProtocol())));
 					}
 					_response.complete();
 				} else {
@@ -330,7 +296,6 @@ public class PacketConnection implements Connection {
 			} catch (Throwable e) {
 				if (e instanceof ThreadDeath)
 					throw (ThreadDeath) e;
-				Log.error(e.getMessage(), e);
 				error = true;
 				throw new IOException(e);
 			} finally {
@@ -443,18 +408,26 @@ public class PacketConnection implements Connection {
 
 	@Override
 	public String toString() {
-		return "PacketConnection [_timeStamp=" + _timeStamp + ", _endp=" + _endp + "]";
+		StringBuilder sb = new StringBuilder("连接上下文[");
+		if (_endp != null) {
+			sb.append(_endp.toString());
+		} else {
+			sb.append("类型=未连接");
+		}
+		sb.append(", 创建时间=");
+		sb.append(_timeStamp);
+		sb.append("]");
+		return sb.toString();
 	}
 
 	public class RequestHandler extends PacketParser.EventHandler {
 
 		@Override
-		public void packetComplete(long contentLength) throws IOException {
+		public void packetComplete(Buffer packetBuffer) throws IOException {
 			_requests++;
 			if (Log.isDebugEnabled()) {
-				Log.debug(String.format("complete receivied request data packet(size=%d)", contentLength));
-				Log.debug(String.format("packet data: %s",
-						new ByteArrayBuffer(_parser.getPacketBuffer().array()).toDetailString()));
+				Log.debug(String.format("完整接收到一个分组数据包(%d字节)", packetBuffer.length()));
+				Log.debug(String.format("数据内容:\n %s\n", packetBuffer.toAllDetailString()));
 			}
 			handleRequest();
 		}

@@ -10,7 +10,7 @@ import com.partsoft.umsp.packet.PacketInputStream;
 public class ConnectResponse extends CmppDataPacket {
 
 	private static final long serialVersionUID = 0x80000001L;
-	
+
 	public int status;
 
 	public String authenticationToken;
@@ -34,7 +34,7 @@ public class ConnectResponse extends CmppDataPacket {
 	@Override
 	protected void readDataInput(DataInput in) throws IOException {
 		super.readDataInput(in);
-		PacketInputStream packet_stream = null; 
+		PacketInputStream packet_stream = null;
 		if (in instanceof PacketInputStream) {
 			packet_stream = (PacketInputStream) in;
 			packet_stream.mark(30);
@@ -43,13 +43,13 @@ public class ConnectResponse extends CmppDataPacket {
 			this.status = in.readInt();
 			this.authenticationToken = readFixedString(in, 16);
 			this.protocolVersion = in.readUnsignedByte();
-			
+
 			if (packet_stream != null) {
 				packet_stream.reset();
 				packet_stream.skip(getDataSize());
 			}
 		} catch (IOException e) {
-			//读取出错啦？ 可能是CMPP2.0
+			// 读取出错啦？ 可能是CMPP2.0
 			if (packet_stream != null) {
 				packet_stream.reset();
 			}
@@ -58,11 +58,11 @@ public class ConnectResponse extends CmppDataPacket {
 			this.protocolVersion = in.readUnsignedByte();
 		}
 	}
-	
+
 	@Override
 	public int getDataSize() {
 		int result = super.getDataSize();
-		if (this.protocolVersion == Constants.VERSION3 ) {
+		if (this.protocolVersion == Constants.VERSION3) {
 			result += 21;
 		} else {
 			result += 18;
@@ -77,10 +77,7 @@ public class ConnectResponse extends CmppDataPacket {
 
 	@Override
 	public String toString() {
-		return "ConnectResponse [status=" + status + ", authenticationToken=" + authenticationToken + ", version="
-				+ protocolVersion + "]";
+		return "移动连接应答包 [应答状态=" + status + ", 协商令牌=" + authenticationToken + ", 协议版本=" + protocolVersion + "]";
 	}
-	
-	
 
 }

@@ -6,7 +6,7 @@ import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 
 public class ByteArrayBuffer extends AbstractBuffer {
-	
+
 	protected byte[] _bytes;
 
 	protected ByteArrayBuffer(int access, boolean isVolatile) {
@@ -41,7 +41,7 @@ public class ByteArrayBuffer extends AbstractBuffer {
 		this(new byte[size], 0, size, READWRITE);
 		setPutIndex(0);
 	}
-	
+
 	public ByteArrayBuffer() {
 		this(DEFAULT_SIZE);
 	}
@@ -70,106 +70,6 @@ public class ByteArrayBuffer extends AbstractBuffer {
 
 	public int capacity() {
 		return _bytes.length;
-	}
-
-	public void compact() {
-		if (isReadOnly())
-			throw new IllegalStateException(__READONLY);
-		int s = markIndex() >= 0 ? markIndex() : getIndex();
-		if (s > 0) {
-			int length = putIndex() - s;
-			if (length > 0) {
-				System.arraycopy(_bytes, s, _bytes, 0, length);
-			}
-			if (markIndex() > 0)
-				setMarkIndex(markIndex() - s);
-			setGetIndex(getIndex() - s);
-			setPutIndex(putIndex() - s);
-		}
-	}
-
-	public boolean equals(Object obj) {
-		if (obj == this)
-			return true;
-
-		if (obj == null || !(obj instanceof Buffer))
-			return false;
-
-		if (obj instanceof Buffer.CaseInsensitve)
-			return equalsIgnoreCase((Buffer) obj);
-
-		Buffer b = (Buffer) obj;
-
-		// reject different lengths
-		if (b.length() != length())
-			return false;
-
-		// reject AbstractBuffer with different hash value
-		if (_hash != 0 && obj instanceof AbstractBuffer) {
-			AbstractBuffer ab = (AbstractBuffer) obj;
-			if (ab._hash != 0 && _hash != ab._hash)
-				return false;
-		}
-
-		// Nothing for it but to do the hard grind.
-		int get = getIndex();
-		int bi = b.putIndex();
-		for (int i = putIndex(); i-- > get;) {
-			byte b1 = _bytes[i];
-			byte b2 = b.peek(--bi);
-			if (b1 != b2)
-				return false;
-		}
-		return true;
-	}
-
-	public boolean equalsIgnoreCase(Buffer b) {
-		if (b == this)
-			return true;
-
-		// reject different lengths
-		if (b == null || b.length() != length())
-			return false;
-
-		// reject AbstractBuffer with different hash value
-		if (_hash != 0 && b instanceof AbstractBuffer) {
-			AbstractBuffer ab = (AbstractBuffer) b;
-			if (ab._hash != 0 && _hash != ab._hash)
-				return false;
-		}
-
-		// Nothing for it but to do the hard grind.
-		int get = getIndex();
-		int bi = b.putIndex();
-		byte[] barray = b.array();
-		if (barray == null) {
-			for (int i = putIndex(); i-- > get;) {
-				byte b1 = _bytes[i];
-				byte b2 = b.peek(--bi);
-				if (b1 != b2) {
-					if ('a' <= b1 && b1 <= 'z')
-						b1 = (byte) (b1 - 'a' + 'A');
-					if ('a' <= b2 && b2 <= 'z')
-						b2 = (byte) (b2 - 'a' + 'A');
-					if (b1 != b2)
-						return false;
-				}
-			}
-		} else {
-			for (int i = putIndex(); i-- > get;) {
-				byte b1 = _bytes[i];
-				byte b2 = barray[--bi];
-				if (b1 != b2) {
-					if ('a' <= b1 && b1 <= 'z')
-						b1 = (byte) (b1 - 'a' + 'A');
-					if ('a' <= b2 && b2 <= 'z')
-						b2 = (byte) (b2 - 'a' + 'A');
-					if (b1 != b2)
-						return false;
-				}
-			}
-		}
-		return true;
 	}
 
 	public byte get() {
@@ -342,7 +242,52 @@ public class ByteArrayBuffer extends AbstractBuffer {
 			return -1;
 		return total;
 	}
-	
+
+	public void increaseCapacity(int capacity) {
+		if (isReadOnly())
+			throw new IllegalStateException(__READONLY);
+		if (capacity > capacity()) {
+			int s = markIndex() >= 0 ? markIndex() : getIndex();
+			byte newBytes[] = new byte[capacity];
+			byte array[] = array();
+			int length = putIndex() - s;
+			if (length > 0) {
+				if (array != null) {
+					System.arraycopy(array, s, newBytes, 0, length);
+				} else {
+					System.arraycopy(peek(s, length).asArray(), 0, newBytes, 0, length);
+				}
+				_bytes = newBytes;
+			}
+			if (markIndex() > 0) {
+				setMarkIndex(markIndex() - s);
+			}
+			setGetIndex(getIndex() - s);
+			setPutIndex(putIndex() - s);
+		}
+	}
+
+	public void compact() {
+		if (isReadOnly())
+			throw new IllegalStateException(__READONLY);
+		int s = markIndex() >= 0 ? markIndex() : getIndex();
+		if (s > 0) {
+			byte array[] = array();
+			int length = putIndex() - s;
+			if (length > 0) {
+				if (array != null) {
+					System.arraycopy(array, s, array, 0, length);
+				} else {
+					poke(0, peek(s, length));
+				}
+			}
+			if (markIndex() > 0) {
+				setMarkIndex(markIndex() - s);
+			}
+			setGetIndex(getIndex() - s);
+			setPutIndex(putIndex() - s);
+		}
+	}
 
 	/* ------------------------------------------------------------ */
 	public int space() {

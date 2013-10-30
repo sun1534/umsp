@@ -6,7 +6,6 @@ import java.io.IOException;
 
 import com.partsoft.umsp.DataPacket;
 import com.partsoft.umsp.io.Buffer;
-import com.partsoft.umsp.log.Log;
 import com.partsoft.umsp.packet.AbstractDataPacket;
 import com.partsoft.utils.Assert;
 
@@ -21,9 +20,6 @@ public abstract class CmppDataPacket extends AbstractDataPacket implements DataP
 
 	// 序列号
 	public int sequenceId;
-
-	// 创建时间
-	public long createTimeMillis = System.currentTimeMillis();
 
 	// 协议版本
 	public int protocolVersion = Constants.VERSION2;
@@ -41,9 +37,6 @@ public abstract class CmppDataPacket extends AbstractDataPacket implements DataP
 	protected void writeDataOutput(DataOutput out) throws IOException {
 		if (out == null)
 			new IOException();
-		if (Log.isDebugEnabled()) {
-			Log.debug(String.format("%s writeData()", getClass().getSimpleName(), this.toString()));
-		}
 		out.writeInt(commandId);
 		out.writeInt(sequenceId);
 	}
@@ -64,18 +57,18 @@ public abstract class CmppDataPacket extends AbstractDataPacket implements DataP
 		return getDataSize() + Buffer.INT_SIZE;
 	}
 
+	public int getCommandID() {
+		return this.commandId;
+	}
+
 	public CmppDataPacket clone() {
 		CmppDataPacket new_obj = (CmppDataPacket) super.clone();
-		new_obj.createTimeMillis = System.currentTimeMillis();
 		return new_obj;
 	}
-	
-	public int compareTo(Object o) {
-		int result = -1;
-		if (o instanceof CmppDataPacket) {
-			result = (int) (this.createTimeMillis - ((CmppDataPacket)o).createTimeMillis);
-		}
-		return result ;
+
+	@Override
+	public String toString() {
+		return "移动CMPP数据包 [命令=" + commandId + ", 序号=" + sequenceId + ", 协议版本=" + protocolVersion + "]";
 	}
 
 }

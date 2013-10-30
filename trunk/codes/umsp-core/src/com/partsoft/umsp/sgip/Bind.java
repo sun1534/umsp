@@ -62,8 +62,8 @@ public class Bind extends SgipDataPacket implements Serializable {
 
 	@Override
 	public String toString() {
-		return "SGIPBind [command=" + command + ", node_id=" + node_id + ", timestamp=" + timestamp + ", sequence="
-				+ sequence + ", type=" + type + ", user=" + user + ", pwd=" + pwd + ", reserve=" + reserve + "]";
+		return "联通SGIP连接请求包 [节点号=" + node_id + ", 时间戳=" + timestamp + ", 序号=" + sequence + ", 请求类型=" + type + ", 用户="
+				+ user + ", 密码=" + pwd + "]";
 	}
 
 }

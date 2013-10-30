@@ -34,10 +34,4 @@ public class UnBind extends SgipDataPacket {
 		return PACKET_SIZE - RESERVE_SIZE;
 	}
 
-	@Override
-	public String toString() {
-		return "SGIPUnBind [command=" + command + ", node_id=" + node_id + ", timestamp=" + timestamp + ", sequence="
-				+ sequence + "]";
-	}
-
 }

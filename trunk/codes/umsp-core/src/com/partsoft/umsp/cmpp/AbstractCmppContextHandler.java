@@ -10,6 +10,7 @@ import com.partsoft.umsp.Request;
 import com.partsoft.umsp.Response;
 import com.partsoft.umsp.handler.AbstractContextHandler;
 import com.partsoft.umsp.io.Buffer;
+import com.partsoft.umsp.io.ByteArrayBuffer;
 import com.partsoft.umsp.log.Log;
 import com.partsoft.umsp.packet.PacketException;
 import com.partsoft.umsp.packet.PacketInputStream;
@@ -45,6 +46,21 @@ public abstract class AbstractCmppContextHandler extends AbstractContextHandler 
 
 	protected int protocolVersion = Constants.VERSION2;
 
+	//收到错误数据包是否抛出异常
+	protected boolean errorCommandException = false;
+	
+	//包提交重试次数
+	protected int packetSubmitRetryTimes = 3;
+	
+	public void setPacketSubmitRetryTimes(int packetSubmitRetryTimes) {
+		Assert.isTrue(packetSubmitRetryTimes >= 1, "包重复提交次数必须大于等于1次");
+		this.packetSubmitRetryTimes = packetSubmitRetryTimes;
+	}
+	
+	public void setErrorCommandException(boolean errorCommandException) {
+		this.errorCommandException = errorCommandException;
+	}
+
 	@Override
 	protected void doStart() throws Exception {
 		super.doStart();
@@ -67,8 +83,7 @@ public abstract class AbstractCmppContextHandler extends AbstractContextHandler 
 
 	protected void doBind(Request request, Response response) throws IOException {
 		if (CmppUtils.testRequestBinded(request)) {
-			Log.warn(String.format("duplicate error bind request packet, packet is:\n%s", CmppUtils
-					.extractRequestPacket(request).toString()));
+			Log.warn(String.format("收到重复的绑定请求包:\n%s\n", CmppUtils.extractRequestPacket(request).toString()));
 			response.finalBuffer();
 		}
 	}
@@ -84,8 +99,8 @@ public abstract class AbstractCmppContextHandler extends AbstractContextHandler 
 	}
 
 	protected void doActiveTestRequest(Request request, Response response) throws IOException {
-		//TODO 临时日志
-		//Log.warn("超时发送链路侦测包...");
+		// TODO 临时日志
+		// Log.warn("超时发送链路侦测包...");
 		CmppUtils.stepIncreaseRequestActiveTest(request);
 		ActiveTest test = ((ActiveTest) this.context_cmpp_packet_maps.get(Commands.CMPP_ACTIVE_TEST)).clone();
 		test.sequenceId = CmppUtils.generateRequestSequence(request);
@@ -96,8 +111,9 @@ public abstract class AbstractCmppContextHandler extends AbstractContextHandler 
 	protected void doActiveTestResponse(Request request, Response response) throws IOException {
 		Assert.isTrue(CmppUtils.testRequestBinded(request));
 		ActiveTestResponse test_response = (ActiveTestResponse) CmppUtils.extractRequestPacket(request);
-		if (Log.isDebugEnabled())
+		if (Log.isDebugEnabled()) {
 			Log.debug(test_response.toString());
+		}
 	}
 
 	protected void doBindResponse(Request request, Response response) throws IOException {
@@ -158,9 +174,8 @@ public abstract class AbstractCmppContextHandler extends AbstractContextHandler 
 		try {
 			CmppUtils.cleanRequestActiveTesting(request);
 			CmppDataPacket packet = readPacketObject(CmppUtils.extractRequestPacketStream(request));
-			if (Log.isDebugEnabled()) {
-				Log.debug(String.format("packet: %s", packet.toString()));
-			}
+			if (packet == null)
+				return;
 			CmppUtils.setupRequestPacket(request, packet);
 			switch (packet.getCommandId()) {
 			case Commands.CMPP_CONNECT:
@@ -213,10 +228,25 @@ public abstract class AbstractCmppContextHandler extends AbstractContextHandler 
 				packet = packet.clone();
 				packet.readExternal(in);
 				result = packet;
-			} else
-				throw new IOException(String.format("not found command: %d", command));
+			} else {
+				IOException errException = new IOException(String.format("收到网关错误的指令: %d", command));
+				int dataCount = in.available();
+				ByteArrayBuffer buffer = new ByteArrayBuffer(dataCount);
+				try {
+					int readedCount = buffer.readFrom(in, dataCount);
+					Log.warn(String.format("收到网关错误的数据包(%d字节)\n%s\n", readedCount, buffer.toAllDetailString()));
+				} catch (Throwable e) {
+					Log.error(
+							String.format("读取并打印网关错误指令包失败: %s\n，已读取到的内容: %s ", e.getMessage(),
+									buffer.toAllDetailString()), e);
+				}
+				if (this.errorCommandException) {
+					throw errException;
+				} else {
+					Log.warn(String.format("忽略错误(%s)", errException.getMessage()), errException);
+				}
+			}
 		} catch (IOException e) {
-			Log.error(e.getMessage(), e);
 			throw new PacketException(e);
 		}
 		return result;

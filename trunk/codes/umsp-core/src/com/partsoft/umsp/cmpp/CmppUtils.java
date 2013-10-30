@@ -222,7 +222,7 @@ public abstract class CmppUtils {
 	}
 
 	/**
-	 * 短连接发送（不重试，出错直接返回）
+	 * 短连接发送(不重试，出错直接返回)
 	 * 
 	 * @param smgp_smg_host
 	 * @param port
@@ -239,7 +239,7 @@ public abstract class CmppUtils {
 	}
 
 	/**
-	 * 短连接发送（不重试，出错直接返回）
+	 * 短连接发送(不重试，出错直接返回)
 	 * 
 	 * @param smgp_smg_host
 	 * @param port

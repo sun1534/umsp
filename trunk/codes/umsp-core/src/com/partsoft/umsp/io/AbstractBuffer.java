@@ -88,26 +88,7 @@ public abstract class AbstractBuffer implements Buffer {
 		setGetIndex(0);
 		setPutIndex(0);
 	}
-
-	public void compact() {
-		if (isReadOnly())
-			throw new IllegalStateException(__READONLY);
-		int s = markIndex() >= 0 ? markIndex() : getIndex();
-		if (s > 0) {
-			byte array[] = array();
-			int length = putIndex() - s;
-			if (length > 0) {
-				if (array != null)
-					System.arraycopy(array(), s, array(), 0, length);
-				else
-					poke(0, peek(s, length));
-			}
-			if (markIndex() > 0)
-				setMarkIndex(markIndex() - s);
-			setGetIndex(getIndex() - s);
-			setPutIndex(putIndex() - s);
-		}
-	}
+	
 
 	public boolean equals(Object obj) {
 		if (obj == this)
@@ -334,9 +315,7 @@ public abstract class AbstractBuffer implements Buffer {
 	}
 
 	public void mark() {
-		//TODO CHANGE BY NEEKER
-		//setMarkIndex(_get - 1);
-		setMarkIndex(_get);
+		setMarkIndex(_get - 1);
 	}
 
 	public void mark(int offset) {
@@ -473,35 +452,15 @@ public abstract class AbstractBuffer implements Buffer {
 	}
 
 	public void setGetIndex(int getIndex) {
-		/*
-		 * bounds checking if (isImmutable()) throw new
-		 * IllegalStateException(__IMMUTABLE); if (getIndex < 0) throw new
-		 * IllegalArgumentException("getIndex<0: " + getIndex + "<0"); if
-		 * (getIndex > putIndex()) throw new
-		 * IllegalArgumentException("getIndex>putIndex: " + getIndex + ">" +
-		 * putIndex());
-		 */
 		_get = getIndex;
 		_hash = 0;
 	}
 
 	public void setMarkIndex(int index) {
-		/*
-		 * if (index>=0 && isImmutable()) throw new
-		 * IllegalStateException(__IMMUTABLE);
-		 */
 		_mark = index;
 	}
 
 	public void setPutIndex(int putIndex) {
-		/*
-		 * bounds checking if (isImmutable()) throw new
-		 * IllegalStateException(__IMMUTABLE); if (putIndex > capacity()) throw
-		 * new IllegalArgumentException("putIndex>capacity: " + putIndex + ">" +
-		 * capacity()); if (getIndex() > putIndex) throw new
-		 * IllegalArgumentException("getIndex>putIndex: " + getIndex() + ">" +
-		 * putIndex);
-		 */
 		_put = putIndex;
 		_hash = 0;
 	}
@@ -531,6 +490,36 @@ public abstract class AbstractBuffer implements Buffer {
 
 	public int space() {
 		return capacity() - _put;
+	}
+
+	public String toAllDetailString() {
+		StringBuffer buf = new StringBuffer();
+		buf.append("[");
+		buf.append(super.hashCode());
+		buf.append(",");
+		buf.append(this.array().hashCode());
+		buf.append(",m=");
+		buf.append(markIndex());
+		buf.append(",g=");
+		buf.append(getIndex());
+		buf.append(",p=");
+		buf.append(putIndex());
+		buf.append(",c=");
+		buf.append(capacity());
+		buf.append("]={");
+		if (markIndex() >= 0) {
+			for (int i = markIndex(); i < getIndex(); i++) {
+				buf.append(HexUtils.toHex(peek(i)));
+				buf.append(' ');
+			}
+			buf.append("}{");
+		}
+		for (int i = getIndex(); i < putIndex(); i++) {
+			buf.append(HexUtils.toHex(peek(i)));
+			buf.append(' ');
+		}
+		buf.append('}');
+		return buf.toString();
 	}
 
 	public String toDetailString() {
@@ -570,7 +559,6 @@ public abstract class AbstractBuffer implements Buffer {
 		return buf.toString();
 	}
 
-	/* ------------------------------------------------------------ */
 	public String toString() {
 		if (isImmutable()) {
 			if (_string == null)
@@ -580,7 +568,6 @@ public abstract class AbstractBuffer implements Buffer {
 		return new String(asArray(), 0, length());
 	}
 
-	/* ------------------------------------------------------------ */
 	public String toDebugString() {
 		return getClass() + "@" + super.hashCode();
 	}

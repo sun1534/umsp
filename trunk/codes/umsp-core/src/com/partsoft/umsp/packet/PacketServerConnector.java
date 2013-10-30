@@ -17,7 +17,7 @@ public class PacketServerConnector extends AbstractConnector {
 	// accept线程数量
 	private int _acceptors = 1;
 
-	// 设置socket连接排队数（0表示为由操作系统控制)
+	// 设置socket连接排队数(0表示为由操作系统控制)
 	private int _acceptQueueSize = 0;
 
 	public PacketServerConnector() {
@@ -89,7 +89,7 @@ public class PacketServerConnector extends AbstractConnector {
 	public void accept(int acceptorID) throws IOException, InterruptedException {
 		Socket socket = _serverSocket.accept();
 		if (Log.isDebugEnabled()) {
-			Log.debug(String.format("client(%s) connected, setup socket config", socket.getRemoteSocketAddress()
+			Log.debug(String.format("客户端(%s)已经连接, 设置套接字参数...", socket.getRemoteSocketAddress()
 					.toString()));
 		}
 		configure(socket);
@@ -115,7 +115,7 @@ public class PacketServerConnector extends AbstractConnector {
 
 			for (int i = 0; i < _dispatchedThreads.length; i++) {
 				if (!getThreadPool().dispatch(new Acceptor(i))) {
-					Log.warn(String.format("insufficient maxThreads configured for %s", getClass().getName()));
+					Log.warn(String.format("连接请求超出最大线程池配置(%s)", getClass().getName()));
 					break;
 				}
 			}
@@ -147,7 +147,7 @@ public class PacketServerConnector extends AbstractConnector {
 				while (isRunning() && getConnection() != null) {
 					try {
 						if (Log.isDebugEnabled()) {
-							Log.debug("Waiting for connection...");
+							Log.debug("等待客户连接...");
 						}
 						accept(_acceptor);
 					} catch (EofException e) {

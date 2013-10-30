@@ -19,7 +19,7 @@ public interface TransmitListener extends EventListener {
 	void transmitted(TransmitEvent event);
 	
 	/**
-	 * 传送完成，传送完成时的回调（例如，服务端已经应答的调用）
+	 * 传送完成，传送完成时的回调(例如，服务端已经应答的调用)
 	 */
 	void endTransmit(TransmitEvent event);
 	

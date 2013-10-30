@@ -99,6 +99,10 @@ public class View extends AbstractBuffer {
 	public void compact() {
 		// TODO
 	}
+	
+	public void increaseCapacity(int capacity) {
+		// TODO
+	}
 
 	/*
 	 * (non-Javadoc)

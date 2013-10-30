@@ -8,6 +8,8 @@ import com.partsoft.umsp.Context;
 import com.partsoft.umsp.OriginHandler;
 import com.partsoft.umsp.Request;
 import com.partsoft.umsp.Response;
+import com.partsoft.umsp.sgip.SubmitResponse;
+import com.partsoft.umsp.sgip.Constants.Commands;
 import com.partsoft.umsp.handler.TransmitEvent;
 import com.partsoft.umsp.handler.TransmitListener;
 import com.partsoft.umsp.log.Log;
@@ -19,6 +21,7 @@ import com.partsoft.utils.CalendarUtils;
 import com.partsoft.utils.ListUtils;
 import com.partsoft.utils.StringUtils;
 
+@SuppressWarnings("unchecked")
 public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHandler {
 
 	private boolean retrySubmit = false;
@@ -30,7 +33,7 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 	protected Object transmitListener;
 
 	protected int maxSubmitPerSecond = 50;
-	
+
 	/**
 	 * 发生错误时是否返回队列
 	 */
@@ -42,7 +45,7 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 
 	public AbstractSgipSPSendHandler() {
 	}
-	
+
 	public void setErrorReturnQueue(boolean errorReturnQueue) {
 		this.errorReturnQueue = errorReturnQueue;
 	}
@@ -98,24 +101,25 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 	 * 
 	 * @return
 	 */
-	protected abstract List<Submit> takeQueuedSubmits();
+	protected abstract List<Submit> takeQueuedSubmits(int count);
 
 	/**
 	 * 判断是否有排队的数据
 	 * 
 	 * @return
 	 */
-	protected abstract boolean testQueuedSubmits();
+	protected abstract int testQueuedSubmits();
 
 	@Override
 	protected void handleTimeout(Request request, Response response) throws IOException {
 		long request_idle_time = System.currentTimeMillis() - request.getRequestTimestamp();
 		boolean request_submiting = SgipUtils.testRequestSubmiting(request);
 		boolean throw_packet_timeout = false;
-		
+		int wellbeTakeCount = 0;
 		if (SgipUtils.testRequestBinded(request)) {
-			if (request_idle_time < this.maxRequestIdleTime && !request_submiting && testQueuedSubmits()) {
-				doPostSubmit(request, response);
+			if (request_idle_time < this.maxRequestIdleTime && !request_submiting
+					&& ((wellbeTakeCount = testQueuedSubmits()) > 0)) {
+				doPostSubmit(request, response, wellbeTakeCount);
 			} else if (request_idle_time >= this.maxRequestIdleTime) {
 				throw_packet_timeout = true;
 			}
@@ -124,40 +128,55 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 		} else {
 			throw_packet_timeout = true;
 		}
-		
+
 		if (throw_packet_timeout) {
 			if (SgipUtils.testRequestSubmiting(request)) {
 				int submitted_result_count = SgipUtils.extractRequestSubmittedRepliedCount(request);
 				int submitted_count = SgipUtils.extractRequestSubmittedCount(request);
-				List<Submit> submitted_list = SgipUtils.extractRequestSubmitteds(request);
-				List<Submit> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
-				if (this.errorReturnQueue) {
-					Log.warn("For a long time not receive a reply, return submit to queue, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
-					returnQueuedSubmits(unresult_list);
-				} else {
-					Log.warn("For a long time not receive a reply, ignored submits, submit-count=" + submitted_count + ", reply-count=" + submitted_count);
-				}
-				SgipUtils.cleanRequestSubmitteds(request);
-				int transmit_listener_size = ListUtils.size(transmitListener);
-				if (transmit_listener_size > 0 && unresult_list.size() > 0) {
-					for (int ii = 0; ii < unresult_list.size(); ii++) {
-						TransmitEvent event = new TransmitEvent(unresult_list.get(ii));
-						for (int i = 0; i < transmit_listener_size; i++) {
-							TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
-							try {
-								listener.transmitTimeout(event);
-							} catch (Exception e) {
-								Log.error("ignored submit transmit timeout error: " + e.getMessage(), e);
+				if (submitted_count > 0 && submitted_result_count < submitted_count) {
+					List<Submit> submitted_list = (List<Submit>) SgipUtils.extractRequestSubmitteds(request);
+					List<Submit> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
+					if (this.errorReturnQueue) {
+						Log.warn(String.format("长时间未收到短信提交应答, 把已提交短信返回待发送队列(%d/%d)", submitted_count, submitted_count));
+						returnQueuedSubmits(unresult_list);
+					} else {
+						Log.warn(String.format("长时间未收到短信提交应答，忽略返回待发队列(%d/%d)", submitted_count, submitted_count));
+					}
+					int transmit_listener_size = ListUtils.size(transmitListener);
+					if (transmit_listener_size > 0 && unresult_list.size() > 0) {
+						for (int ii = 0; ii < unresult_list.size(); ii++) {
+							TransmitEvent event = null;
+							if (this.errorReturnQueue) {
+								event = new TransmitEvent(unresult_list.get(ii));
+							} else {
+								Submit submitted = unresult_list.get(ii);
+								SubmitResponse res = (SubmitResponse) context_sgip_packet_maps.get(
+										Commands.SUBMIT_RESPONSE).clone();
+								res.result = 1;
+								event = new TransmitEvent(new Object[] { submitted, res });
+							}
+							for (int i = 0; i < transmit_listener_size; i++) {
+								TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
+								try {
+									if (this.errorReturnQueue) {
+										listener.transmitTimeout(event);
+									} else {
+										listener.endTransmit(event);
+									}
+								} catch (Exception e) {
+									Log.warn(String.format("忽略应答超时后处理错误(%s)", e.getMessage()), e);
+								}
 							}
 						}
 					}
 				}
+				SgipUtils.cleanRequestSubmitteds(request);
 			}
-			throw new PacketException(String.format(maxRequestIdleTime + " millisecond not reply"));
+			throw new PacketException(String.format("空闲%d毫秒后未收到应答", maxRequestIdleTime));
 		}
 	}
 
-	protected void doPostSubmit(Request request, Response response) throws IOException {
+	protected void doPostSubmit(Request request, Response response, int wellbeTakeCount) throws IOException {
 		// 上次流量统计的开始时间
 		long flowLastTime = SgipUtils.extractRequestFlowLastTime(request);
 		// 上次统计以来流量总数
@@ -177,14 +196,14 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 		}
 
 		int node_id = getNodeId();
-		String enterprise_id = Integer.toString(this.enterpriseId);
-		String sp_numer = Integer.toString(this.spNumber);
+		String enterprise_id = this.enterpriseId;
+		String sp_numer = this.spNumber;
 		Integer submitted = 0;
 		List<Submit> takedPostSubmits = null;
 		try {
-			takedPostSubmits = takeQueuedSubmits();
+			takedPostSubmits = takeQueuedSubmits(wellbeTakeCount);
 		} catch (Throwable e) {
-			Log.error("take submit from queue error: " + e.getMessage(), e);
+			Log.warn("从待发队列中获取短信失败: " + e.getMessage(), e);
 		}
 		if (takedPostSubmits != null) {
 			for (Submit sb : takedPostSubmits) {
@@ -192,7 +211,13 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 					sb.sp_number = sp_numer;
 				}
 				sb.corporation_id = enterprise_id;
-				SgipUtils.stuffSerialNumber(sb, request, node_id, sb.createTimeMillis);
+				
+				if (sb.submitCount >= this.packetSubmitRetryTimes) {
+					Log.warn(String.format("忽略已重发%d次给用户(%s)的短信:\n%s\n", sb.submitCount,
+							sb.getUserNumbersTrimCNPrefix(), sb.toString()));
+					continue;
+				}
+				
 				sb.node_id = node_id;
 				sb.timestamp = CalendarUtils.getTimestampInYearDuring(sb.createTimeMillis);
 				sb.sequence = SgipUtils.generateContextSequence(request.getContext());
@@ -205,13 +230,14 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 						try {
 							evnListener.beginTransmit(event);
 						} catch (Throwable e) {
-							Log.error("ignored submit begin transmit error: " + e.getMessage(), e);
+							Log.warn(String.format("被忽略的短信提交前处理错误(%s)", e.getMessage()), e);
 						}
 					}
 				}
 				try {
 					SgipUtils.renderDataPacket(request, response, sb);
 					response.flushBuffer();
+					sb.submitCount++;
 					SgipUtils.updateSubmitteds(request, takedPostSubmits, submitted + 1);
 					flowTotal++;
 					SgipUtils.updateRequestFlowTotal(request, flowLastTime, flowTotal);
@@ -221,7 +247,27 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 						returnQueuedSubmits(takedPostSubmits);
 					} else {
 						returnQueuedSubmits(takedPostSubmits.subList(submitted, takedPostSubmits.size()));
+						for (int ei = 0; ei < submitted; ei++) {
+							transmit_listener_size = ListUtils.size(transmitListener);
+							if (transmit_listener_size > 0) {
+								Submit ignSubmitted = takedPostSubmits.get(ei);
+								SubmitResponse res = (SubmitResponse) this.context_sgip_packet_maps.get(
+										Commands.SUBMIT_RESPONSE).clone();
+								res.result = 1;
+								TransmitEvent event = new TransmitEvent(new Object[] { ignSubmitted, res });
+								for (int j = 0; j < transmit_listener_size; j++) {
+									TransmitListener evnListener = (TransmitListener) ListUtils
+											.get(transmitListener, j);
+									try {
+										evnListener.endTransmit(event);
+									} catch (Throwable ee) {
+										Log.warn(String.format("提交出错后被忽略的提交后处理错误(%s)", e.getMessage()), ee);
+									}
+								}
+							}
+						}
 					}
+					SgipUtils.cleanRequestSubmitteds(request);
 					throw e;
 				}
 				submitted++;
@@ -234,7 +280,7 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 						try {
 							evnListener.transmitted(event);
 						} catch (Throwable e) {
-							Log.error("ignored submit transmit error: " + e.getMessage(), e);
+							Log.warn(String.format("被忽略的提交后处理错误(%s)", e.getMessage()), e);
 						}
 					}
 				}
@@ -252,7 +298,7 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 
 		if (SgipUtils.testRequestSubmiting(request)) {
 			int last_pare_submit_index = SgipUtils.extractRequestSubmittedRepliedCount(request);
-			List<Submit> posts = SgipUtils.extractRequestSubmitteds(request);
+			List<Submit> posts = (List<Submit>) SgipUtils.extractRequestSubmitteds(request);
 			SgipUtils.updateSubmittedRepliedCount(request, last_pare_submit_index + 1);
 			Submit submitted = posts.get(last_pare_submit_index);
 			int transmit_listener_size = ListUtils.size(transmitListener);
@@ -263,27 +309,31 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 					try {
 						evnListener.endTransmit(event);
 					} catch (Throwable e) {
-						Log.error("ignored end transmit error: " + e.getMessage(), e);
+						Log.warn(String.format("被忽略的短信提交网关应答后处理错误(%s)", e.getMessage()), e);
 					}
 				}
 			}
-			if (SgipUtils.extractRequestSubmittedRepliedCount(request) >= SgipUtils.extractRequestSubmittedCount(request)) {
+			if (SgipUtils.extractRequestSubmittedRepliedCount(request) >= SgipUtils
+					.extractRequestSubmittedCount(request)) {
 				returnQueuedSubmits(null);
 				SgipUtils.cleanRequestSubmitteds(request);
-				if (testQueuedSubmits()) {
-					this.doPostSubmit(request, response);
+				int wellbeTakeCount = 0;
+				if ((wellbeTakeCount = testQueuedSubmits()) > 0) {
+					this.doPostSubmit(request, response, wellbeTakeCount);
 				} else {
 					do_unbind = isAutoReSubmit() ? false : true;
 				}
 			}
 		} else {
-			Log.warn("not found submitted, but receive submit reply???");
+			Log.warn("未提交短信，却收到提交应答指令???");
 			do_unbind = isAutoReSubmit() ? false : true;
 		}
 
 		if (do_unbind) {
 			UnBind unbind = new UnBind();
-			SgipUtils.stuffSerialNumber(unbind, request, getNodeId(), unbind.createTimeMillis);
+			unbind.node_id = this.getNodeId();
+			unbind.timestamp = CalendarUtils.getTimestampInYearDuring(unbind.createTimeMillis);
+			unbind.sequence = SgipUtils.generateRequestSequence(request);
 			SgipUtils.renderDataPacket(request, response, unbind);
 			response.finalBuffer();
 		}
@@ -300,11 +350,12 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 		BindResponse res = (BindResponse) SgipUtils.extractRequestPacket(request);
 		if (res.result == BindResults.SUCCESS) {
 			SgipUtils.setupRequestBinded(request, true);
-			if (testQueuedSubmits()) {
-				doPostSubmit(request, response);
+			int wellbeTakeCount = 0;
+			if ((wellbeTakeCount = testQueuedSubmits()) > 0) {
+				doPostSubmit(request, response, wellbeTakeCount);
 			}
 		} else {
-			throw new BindException("bind error, please check user or password or  validate your ip address");
+			throw new BindException("登录错误, 请检查用户或密码错误以及客户IP是否正确, 应答: " + res.toString());
 		}
 	}
 
@@ -322,7 +373,9 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 		bind.pwd = password;
 		bind.type = BindTypes.SP_TO_SMG;
 
-		SgipUtils.stuffSerialNumber(bind, request, getNodeId(), bind.createTimeMillis);
+		bind.node_id = this.getNodeId();
+		bind.timestamp = CalendarUtils.getTimestampInYearDuring(bind.createTimeMillis);
+		bind.sequence = SgipUtils.generateRequestSequence(request);
 		SgipUtils.renderDataPacket(request, response, bind);
 		response.flushBuffer();
 	}
@@ -348,15 +401,46 @@ public abstract class AbstractSgipSPSendHandler extends AbstractSgipContextSPHan
 	@Override
 	protected void handleDisConnect(Request request, Response response) {
 		if (SgipUtils.testRequestBinded(request) && SgipUtils.testRequestSubmiting(request)) {
-			int submittedCount = SgipUtils.extractRequestSubmittedCount(request);
-			int submittedResultCount = SgipUtils.extractRequestSubmittedRepliedCount(request);
-			if (this.errorReturnQueue) {
-				Log.warn("return submitted to queue, submit-count=" + submittedCount + ", reply-count=" + submittedResultCount);
-				List<Submit> submitts = SgipUtils.extractRequestSubmitteds(request);
-				returnQueuedSubmits(submitts.subList(submittedResultCount, submittedCount));
-			} else {
-				Log.warn("ignore submits, submit-count=" + submittedCount + ", reply-count=" + submittedResultCount);
+			int submitted_count = SgipUtils.extractRequestSubmittedCount(request);
+			int submitted_result_count = SgipUtils.extractRequestSubmittedRepliedCount(request);
+			if (submitted_count > 0 && submitted_result_count < submitted_count) {
+				List<Submit> submitted_list = (List<Submit>) SgipUtils.extractRequestSubmitteds(request);
+				List<Submit> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
+				if (this.errorReturnQueue) {
+					Log.warn(String.format("连接断开，返回已提交未应答短信至待发队列(%d/%d)", submitted_result_count, submitted_count));
+					returnQueuedSubmits(unresult_list);
+				} else {
+					Log.warn(String.format("连接断开，忽略已提交未应答短信(%d/%d)", submitted_result_count, submitted_count));
+					int transmit_listener_size = ListUtils.size(transmitListener);
+					if (transmit_listener_size > 0 && unresult_list.size() > 0) {
+						for (int ii = 0; ii < unresult_list.size(); ii++) {
+							TransmitEvent event = null;
+							if (this.errorReturnQueue) {
+								event = new TransmitEvent(unresult_list.get(ii));
+							} else {
+								Submit submitted = unresult_list.get(ii);
+								SubmitResponse res = (SubmitResponse) context_sgip_packet_maps.get(
+										Commands.SUBMIT_RESPONSE).clone();
+								res.result = 1;
+								event = new TransmitEvent(new Object[] { submitted, res });
+							}
+							for (int i = 0; i < transmit_listener_size; i++) {
+								TransmitListener listener = (TransmitListener) ListUtils.get(transmitListener, i);
+								try {
+									if (this.errorReturnQueue) {
+										listener.transmitTimeout(event);
+									} else {
+										listener.endTransmit(event);
+									}
+								} catch (Exception e) {
+									Log.warn(String.format("忽略应答超时后处理错误(%s)", e.getMessage()), e);
+								}
+							}
+						}
+					}
+				}
 			}
+			SgipUtils.cleanRequestSubmitteds(request);
 		}
 		super.handleDisConnect(request, response);
 	}
