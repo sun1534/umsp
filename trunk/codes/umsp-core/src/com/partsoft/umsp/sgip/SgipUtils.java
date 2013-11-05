@@ -173,13 +173,15 @@ public abstract class SgipUtils {
 
 		String messageContext = well_convert_submit.getMessageContent();
 		int maxOneMessageLen = SMS.MAX_SMS_ONEMSG_CONTENT - signPlaceHolderLen;
-		int maxCascadeMessageLen = SMS.MAX_SMS_CASCADEMSG_CONTENT - signPlaceHolderLen;
+		int maxCascadeMessageLen = SMS.MAX_SMS_CASCADEMSG_CONTENT;
 		int maxMessageLen = maxCascadeMessageLen * SMS.MAX_SMS_CASCADES;
 
 		int pt = 1;
-		if (messageContext.length() > maxOneMessageLen) {
-			pt = messageContext.length() / maxCascadeMessageLen;
-			pt = (messageContext.length() % maxCascadeMessageLen) > 0 ? pt + 1 : pt;
+		int messageContextLen = messageContext.length();
+		if (messageContextLen > maxOneMessageLen) {
+			int realMessageContextLen = messageContextLen + signPlaceHolderLen;
+			pt = realMessageContextLen / maxCascadeMessageLen;
+			pt = (realMessageContextLen % maxCascadeMessageLen) > 0 ? pt + 1 : pt;
 		}
 
 		if (pt > SMS.MAX_SMS_CASCADES) {
@@ -206,9 +208,9 @@ public abstract class SgipUtils {
 			if (pt > 1) {
 				int i = 0;
 				int blStart = 0;
-				int blEnd = maxCascadeMessageLen;
+				int blEnd = maxCascadeMessageLen > messageContextLen ? messageContextLen : maxCascadeMessageLen;
 				byte rondPack = (byte) (((byte) (RandomUtils.randomInteger() % 255)) & 0xFF);
-				while (blStart < messageContext.length()) {
+				while (blStart < messageContextLen) {
 					i = i + 1;
 					String packetMessage = messageContext.substring(blStart, blEnd);
 					Submit submit = well_convert_submit.clone();
@@ -218,9 +220,17 @@ public abstract class SgipUtils {
 					results.add(submit);
 					blStart += packetMessage.length();
 					blEnd += packetMessage.length();
-					if (blEnd > messageContext.length()) {
-						blEnd = messageContext.length();
+					if (blEnd > messageContextLen) {
+						blEnd = messageContextLen;
 					}
+				}
+				if (i < pt) {
+					i = i + 1;
+					Submit submit = well_convert_submit.clone();
+					submit.user_count = nlLength;
+					submit.user_number = user_numbers;
+					submit.setCascadeMessageContent("", rondPack, pt, i);
+					results.add(submit);
 				}
 			}
 			if (results.size() <= 0) {

@@ -20,7 +20,7 @@ public abstract class Constants {
 		public static final int MAX_SMS_USER_NUMBERS = 50;
 		
 		//最大签名长度
-		public static final int MAX_SMS_SIGN_LEN = 16;
+		public static final int MAX_SMS_SIGN_LEN = 24;
 	}
 	
 	public static final class MessageCodes {

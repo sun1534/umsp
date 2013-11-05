@@ -431,6 +431,10 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 			List<Submit> posts = (List<Submit>) SmgpUtils.extractRequestSubmitteds(request);
 			SmgpUtils.updateSubmittedRepliedCount(request, last_pare_submit_index + 1);
 			Submit submitted = posts.get(last_pare_submit_index);
+			if (res.Status != 0) {
+				Log.warn(String.format("发送包:\n%s\n收到错误应答码: \n%s\n", submitted.toString(), res.toString()));
+			}
+			
 			int transmit_listener_size = ListUtils.size(transmitListener);
 			if (transmit_listener_size > 0) {
 				TransmitEvent event = new TransmitEvent(new Object[] { submitted, res });

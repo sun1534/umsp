@@ -284,7 +284,7 @@ public abstract class CmppUtils {
 	public static List<Submit> convertSubmits(Submit well_convert_submit, int signPlaceHolderLen) {
 		return convertSubmits(well_convert_submit, signPlaceHolderLen, SMS.MAX_SMS_USER_NUMBERS);
 	}
-
+	
 	/**
 	 * 把submit转换为Submit列表<br>
 	 * <ul>
@@ -307,13 +307,15 @@ public abstract class CmppUtils {
 
 		String messageContext = well_convert_submit.getMessageContent();
 		int maxOneMessageLen = SMS.MAX_SMS_ONEMSG_CONTENT - signPlaceHolderLen;
-		int maxCascadeMessageLen = SMS.MAX_SMS_CASCADEMSG_CONTENT - signPlaceHolderLen;
+		int maxCascadeMessageLen = SMS.MAX_SMS_CASCADEMSG_CONTENT;
 		int maxMessageLen = maxCascadeMessageLen * SMS.MAX_SMS_CASCADES;
 
 		int pt = 1;
-		if (messageContext.length() > maxOneMessageLen) {
-			pt = messageContext.length() / maxCascadeMessageLen;
-			pt = (messageContext.length() % maxCascadeMessageLen) > 0 ? pt + 1 : pt;
+		int messageContextLen = messageContext.length();
+		if (messageContextLen > maxOneMessageLen) {
+			int realMessageContextLen = messageContextLen + signPlaceHolderLen;
+			pt = realMessageContextLen / maxCascadeMessageLen;
+			pt = (realMessageContextLen % maxCascadeMessageLen) > 0 ? pt + 1 : pt;
 		}
 
 		if (pt > SMS.MAX_SMS_CASCADES) {
@@ -339,9 +341,9 @@ public abstract class CmppUtils {
 			if (pt > 1) {
 				int i = 0;
 				int blStart = 0;
-				int blEnd = maxCascadeMessageLen;
+				int blEnd = maxCascadeMessageLen > messageContextLen ? messageContextLen : maxCascadeMessageLen;
 				byte rondPack = (byte) (((byte) (RandomUtils.randomInteger() % 255)) & 0xFF);
-				while (blStart < messageContext.length()) {
+				while (blStart < messageContextLen) {
 					i = i + 1;
 					String packetMessage = messageContext.substring(blStart, blEnd);
 					Submit submit = well_convert_submit.clone();
@@ -351,9 +353,17 @@ public abstract class CmppUtils {
 					results.add(submit);
 					blStart += packetMessage.length();
 					blEnd += packetMessage.length();
-					if (blEnd > messageContext.length()) {
-						blEnd = messageContext.length();
+					if (blEnd > messageContextLen) {
+						blEnd = messageContextLen;
 					}
+				}
+				if (i < pt) {
+					i = i + 1;
+					Submit submit = well_convert_submit.clone();
+					submit.setCascadeMessageContent("", rondPack, pt, i);
+					submit.destUserCount = nlLength;
+					submit.destTerminalIds = user_numbers;
+					results.add(submit);
 				}
 			}
 			if (results.size() <= 0) {
@@ -784,6 +794,13 @@ public abstract class CmppUtils {
 	public static int extractRequestReceiveFlowTotal(Request request) {
 		Integer result = (Integer) request.getAttribute(ARG_RECV_FLOW_TOTAL);
 		return result == null ? 0 : result;
+	}
+	
+	public static void main(String[] args) {
+		Submit submit = new Submit();
+		submit.setUserNumbers("13317312768");
+		submit.setMessageContent("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+		System.out.println(convertSubmits(submit, 6, 1).size());
 	}
 
 }
