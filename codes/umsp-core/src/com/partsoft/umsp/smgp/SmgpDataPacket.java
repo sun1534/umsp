@@ -3,7 +3,6 @@ package com.partsoft.umsp.smgp;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.util.Date;
 
 import com.partsoft.umsp.DataPacket;
 import com.partsoft.umsp.io.Buffer;
@@ -19,8 +18,6 @@ public abstract class SmgpDataPacket extends AbstractDataPacket implements DataP
 	public final int requestId;
 
 	public int sequenceId;
-
-	public transient long createTimeMillis = System.currentTimeMillis();
 
 	public boolean enabled = true;
 
@@ -55,17 +52,8 @@ public abstract class SmgpDataPacket extends AbstractDataPacket implements DataP
 		return getDataSize() + Buffer.INT_SIZE;
 	}
 
-	public long getCreateTimeMillis() {
-		return createTimeMillis;
-	}
-
-	public Date getCreateTime() {
-		return new Date(getCreateTimeMillis());
-	}
-
 	public SmgpDataPacket clone() {
 		SmgpDataPacket new_obj = (SmgpDataPacket) super.clone();
-		new_obj.createTimeMillis = System.currentTimeMillis();
 		return new_obj;
 	}
 	

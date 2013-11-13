@@ -36,11 +36,17 @@ public abstract class AbstractSgipSMGSendHandler extends AbstractSgipContextHand
 	 */
 	protected boolean errorReturnQueue = true;
 
+	protected String serviceNumber;
+
 	protected String nodeId;
 
 	protected String account;
 
 	protected String password;
+
+	public void setServiceNumber(String serviceNumber) {
+		this.serviceNumber = serviceNumber;
+	}
 
 	public void setAccount(String account) {
 		this.account = account;
@@ -113,21 +119,21 @@ public abstract class AbstractSgipSMGSendHandler extends AbstractSgipContextHand
 	 * @param from
 	 * @param length
 	 */
-	protected abstract void returnQueuedSubmits(List<MoForwardPacket> submits);
+	protected abstract void returnQueuedSubmits(String number, List<MoForwardPacket> submits);
 
 	/**
 	 * 提取排队发送的数据
 	 * 
 	 * @return
 	 */
-	protected abstract List<MoForwardPacket> takeQueuedSubmits(int count);
+	protected abstract List<MoForwardPacket> takeQueuedSubmits(String spNumber, int count);
 
 	/**
 	 * 判断是否有排队的数据
 	 * 
 	 * @return
 	 */
-	protected abstract int testQueuedSubmits();
+	protected abstract int testQueuedSubmits(String serviceNumber);
 
 	@Override
 	protected void handleTimeout(Request request, Response response) throws IOException {
@@ -137,7 +143,7 @@ public abstract class AbstractSgipSMGSendHandler extends AbstractSgipContextHand
 		int wellbeTakeCount = 0;
 		if (SgipUtils.testRequestBinded(request)) {
 			if (request_idle_time < this.maxRequestIdleTime && !request_submiting
-					&& ((wellbeTakeCount = testQueuedSubmits()) > 0)) {
+					&& ((wellbeTakeCount = testQueuedSubmits(this.serviceNumber)) > 0)) {
 				doPostSubmit(request, response, wellbeTakeCount);
 			} else if (request_idle_time >= this.maxRequestIdleTime) {
 				throw_packet_timeout = true;
@@ -152,11 +158,12 @@ public abstract class AbstractSgipSMGSendHandler extends AbstractSgipContextHand
 			if (SgipUtils.testRequestSubmiting(request)) {
 				int submitted_result_count = SgipUtils.extractRequestSubmittedRepliedCount(request);
 				int submitted_count = SgipUtils.extractRequestSubmittedCount(request);
-				List<MoForwardPacket> submitted_list = (List<MoForwardPacket>) SgipUtils.extractRequestSubmitteds(request);
+				List<MoForwardPacket> submitted_list = (List<MoForwardPacket>) SgipUtils
+						.extractRequestSubmitteds(request);
 				List<MoForwardPacket> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
 				if (this.errorReturnQueue) {
 					Log.warn(String.format("长时间未收到上行短信提交应答, 把已提交短信返回待发送队列(%d/%d)", submitted_count, submitted_count));
-					returnQueuedSubmits(unresult_list);
+					returnQueuedSubmits(this.serviceNumber, unresult_list);
 				} else {
 					Log.warn(String.format("长时间未收到上行短信提交应答，忽略返回待发队列(%d/%d)", submitted_count, submitted_count));
 				}
@@ -207,12 +214,13 @@ public abstract class AbstractSgipSMGSendHandler extends AbstractSgipContextHand
 		int flowTotal = SgipUtils.extractRequestFlowTotal(request);
 		// 当前时间
 		long currentTimeMilles = System.currentTimeMillis();
-		if (Log.isDebugEnabled()) {
-			Log.debug(String.format("time=%d, interal=%d, total=%d ", currentTimeMilles,
-					(currentTimeMilles - flowLastTime), flowTotal));
-		}
+
 		// 如果间隔小于1秒和发送总数大于
 		if ((currentTimeMilles - flowLastTime) < 1000 && flowTotal >= this.maxSubmitPerSecond) {
+			if (Log.isDebugEnabled()) {
+				Log.debug(String.format("流量超限(%d秒内已发%d条)，最大允许每次秒发送%d条", (currentTimeMilles - flowLastTime) / 1000,
+						flowTotal, this.maxSubmitPerSecond));
+			}
 			return;
 		} else if ((currentTimeMilles - flowLastTime) >= 1000) {
 			flowLastTime = currentTimeMilles;
@@ -223,7 +231,7 @@ public abstract class AbstractSgipSMGSendHandler extends AbstractSgipContextHand
 		Integer submitted = 0;
 		List<MoForwardPacket> takedPostSubmits = null;
 		try {
-			takedPostSubmits = takeQueuedSubmits(wellbeTakeCount);
+			takedPostSubmits = takeQueuedSubmits(this.serviceNumber, wellbeTakeCount);
 		} catch (Throwable e) {
 			Log.error("从队列中获取提交数据失败: " + e.getMessage(), e);
 		}
@@ -255,22 +263,24 @@ public abstract class AbstractSgipSMGSendHandler extends AbstractSgipContextHand
 						try {
 							evnListener.beginTransmit(event);
 						} catch (Throwable e) {
-							Log.error("ignored submit begin transmit error: " + e.getMessage(), e);
+							Log.error("被忽略的提交前传输处理错误: " + e.getMessage(), e);
 						}
 					}
 				}
 				try {
 					SgipUtils.renderDataPacket(request, response, sb);
 					response.flushBuffer();
+					sb.submitCount++;
 					SgipUtils.updateSubmitteds(request, takedPostSubmits, submitted + 1);
 					flowTotal++;
 					SgipUtils.updateRequestFlowTotal(request, flowLastTime, flowTotal);
 				} catch (IOException e) {
 					SgipUtils.cleanRequestSubmitteds(request);
 					if (this.errorReturnQueue) {
-						returnQueuedSubmits(takedPostSubmits);
+						returnQueuedSubmits(this.serviceNumber, takedPostSubmits);
 					} else {
-						returnQueuedSubmits(takedPostSubmits.subList(submitted, takedPostSubmits.size()));
+						returnQueuedSubmits(this.serviceNumber,
+								takedPostSubmits.subList(submitted, takedPostSubmits.size()));
 						for (int ei = 0; ei < submitted; ei++) {
 							transmit_listener_size = ListUtils.size(transmitListener);
 							if (transmit_listener_size > 0) {
@@ -321,7 +331,7 @@ public abstract class AbstractSgipSMGSendHandler extends AbstractSgipContextHand
 	}
 
 	protected void doSubmitResult(Request request, Response response) throws IOException {
-		SubmitResponse res = (SubmitResponse) SgipUtils.extractRequestPacket(request);
+		ResponsePacket res = (ResponsePacket) SgipUtils.extractRequestPacket(request);
 		if (Log.isDebugEnabled()) {
 			Log.debug(res.toString());
 		}
@@ -347,10 +357,10 @@ public abstract class AbstractSgipSMGSendHandler extends AbstractSgipContextHand
 			}
 			if (SgipUtils.extractRequestSubmittedRepliedCount(request) >= SgipUtils
 					.extractRequestSubmittedCount(request)) {
-				returnQueuedSubmits(null);
+				returnQueuedSubmits(this.serviceNumber, null);
 				SgipUtils.cleanRequestSubmitteds(request);
 				int wellbeTakeCount = 0;
-				if ((wellbeTakeCount = testQueuedSubmits()) > 0) {
+				if ((wellbeTakeCount = testQueuedSubmits(this.serviceNumber)) > 0) {
 					this.doPostSubmit(request, response, wellbeTakeCount);
 				} else {
 					do_unbind = isAutoReSubmit() ? false : true;
@@ -365,7 +375,7 @@ public abstract class AbstractSgipSMGSendHandler extends AbstractSgipContextHand
 			UnBind unbind = new UnBind();
 			unbind.node_id = intNodeId();
 			unbind.timestamp = CalendarUtils.getTimestampInYearDuring(unbind.createTimeMillis);
-			unbind.sequence = SgipUtils.generateRequestSequence(request); 
+			unbind.sequence = SgipUtils.generateRequestSequence(request);
 			SgipUtils.renderDataPacket(request, response, unbind);
 			response.finalBuffer();
 		}
@@ -383,7 +393,7 @@ public abstract class AbstractSgipSMGSendHandler extends AbstractSgipContextHand
 		if (res.result == BindResults.SUCCESS) {
 			SgipUtils.setupRequestBinded(request, true);
 			int wellbeTakeCount = 0;
-			if ((wellbeTakeCount = testQueuedSubmits()) > 0) {
+			if ((wellbeTakeCount = testQueuedSubmits(this.serviceNumber)) > 0) {
 				doPostSubmit(request, response, wellbeTakeCount);
 			}
 		} else {
@@ -392,8 +402,14 @@ public abstract class AbstractSgipSMGSendHandler extends AbstractSgipContextHand
 	}
 
 	@Override
-	protected void doSubmitResponse(Request request, Response response) throws IOException {
-		super.doSubmitResponse(request, response);
+	protected void doReportResponse(Request request, Response response) throws IOException {
+		super.doReportResponse(request, response);
+		doSubmitResult(request, response);
+	}
+
+	@Override
+	protected void doDeliverResponse(Request request, Response response) throws IOException {
+		super.doDeliverResponse(request, response);
 		doSubmitResult(request, response);
 	}
 
@@ -407,7 +423,7 @@ public abstract class AbstractSgipSMGSendHandler extends AbstractSgipContextHand
 
 		bind.node_id = intNodeId();
 		bind.timestamp = CalendarUtils.getTimestampInYearDuring(bind.createTimeMillis);
-		bind.sequence = SgipUtils.generateRequestSequence(request); 
+		bind.sequence = SgipUtils.generateRequestSequence(request);
 		SgipUtils.renderDataPacket(request, response, bind);
 		response.flushBuffer();
 	}
@@ -436,11 +452,12 @@ public abstract class AbstractSgipSMGSendHandler extends AbstractSgipContextHand
 			int submitted_count = SgipUtils.extractRequestSubmittedCount(request);
 			int submitted_result_count = SgipUtils.extractRequestSubmittedRepliedCount(request);
 			if (submitted_count > 0 && submitted_result_count < submitted_count) {
-				List<MoForwardPacket> submitted_list = (List<MoForwardPacket>) SgipUtils.extractRequestSubmitteds(request);
+				List<MoForwardPacket> submitted_list = (List<MoForwardPacket>) SgipUtils
+						.extractRequestSubmitteds(request);
 				List<MoForwardPacket> unresult_list = submitted_list.subList(submitted_result_count, submitted_count);
 				if (this.errorReturnQueue) {
 					Log.warn(String.format("连接断开，返回已提交未应答上行短信至待发队列(%d/%d)", submitted_result_count, submitted_count));
-					this.returnQueuedSubmits(unresult_list);
+					this.returnQueuedSubmits(this.serviceNumber, unresult_list);
 				} else {
 					Log.warn(String.format("连接断开，忽略已提交未应答短信(%d/%d)", submitted_result_count, submitted_count));
 					int transmit_listener_size = ListUtils.size(transmitListener);

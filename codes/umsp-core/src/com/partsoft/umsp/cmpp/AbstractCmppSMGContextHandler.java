@@ -157,7 +157,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 				if (requestMaxSubmitsPerSecond < 10) {
 					requestMaxSubmitsPerSecond = this.maxSubmitPerSecond;
 				}
-				
+
 				requestMaxDeliversPerSecond = resolveRequestMaxDeliversPerSecond(bind.enterpriseId);
 				if (requestMaxDeliversPerSecond < 10) {
 					requestMaxDeliversPerSecond = this.maxDeliverPerSecond;
@@ -328,12 +328,12 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 		int flowTotal = CmppUtils.extractRequestFlowTotal(request);
 		// 当前时间
 		long currentTimeMilles = System.currentTimeMillis();
-		if (Log.isDebugEnabled()) {
-			Log.info(String.format("time=%d, interal=%d, total=%d ", currentTimeMilles,
-					(currentTimeMilles - flowLastTime), flowTotal));
-		}
 		// 如果间隔小于1秒和发送总数大于
 		if ((currentTimeMilles - flowLastTime) < 1000 && flowTotal >= currentMaxDeliverPerSecond) {
+			if (Log.isDebugEnabled()) {
+				Log.debug(String.format("流量超限(%d秒内已发%d条)，最大允许每次秒发送%d条", (currentTimeMilles - flowLastTime) / 1000,
+						flowTotal, currentMaxDeliverPerSecond));
+			}
 			return;
 		} else if ((currentTimeMilles - flowLastTime) >= 1000) {
 			flowLastTime = currentTimeMilles;
@@ -377,6 +377,7 @@ public abstract class AbstractCmppSMGContextHandler extends AbstractCmppContextH
 				try {
 					CmppUtils.renderDataPacket(request, response, sb);
 					response.flushBuffer();
+					sb.submitCount++;
 					CmppUtils.updateSubmitteds(request, takedPostSubmits, submitted + 1);
 					flowTotal++;
 					CmppUtils.updateRequestFlowTotal(request, flowLastTime, flowTotal);

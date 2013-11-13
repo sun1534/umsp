@@ -1,32 +1,32 @@
 package com.partsoft.umsp.sgip;
 
-import java.io.Serializable;
 import java.util.List;
 
-import com.partsoft.umsp.BatchPool;
+import com.partsoft.umsp.DataPacket;
+import com.partsoft.umsp.FilterableBatchPool;
 
-@SuppressWarnings({"unchecked", "rawtypes"})
 public class BatchPoolSgipSMGSendHandler extends AbstractSgipSMGSendHandler {
 	
-	protected BatchPool<? extends Serializable> batchPool;
+	protected FilterableBatchPool<MoForwardPacket> batchPool;
 	
-	public void setBatchPool(BatchPool<? extends Serializable> batchPool) {
-		this.batchPool = batchPool;
+	@SuppressWarnings("unchecked")
+	public void setBatchPool(FilterableBatchPool<? extends DataPacket> batchPool) {
+		this.batchPool = (FilterableBatchPool<MoForwardPacket>) batchPool;
 	}
 
 	@Override
-	protected void returnQueuedSubmits(List<MoForwardPacket> submits) {
-		this.batchPool.returnObjects((List)submits);
+	protected void returnQueuedSubmits(String serviceNumber, List<MoForwardPacket> submits) {
+		this.batchPool.returnObjects(submits, serviceNumber);
 	}
 
 	@Override
-	protected List<MoForwardPacket> takeQueuedSubmits(int count) {
-		return (List<MoForwardPacket>) this.batchPool.takeObjects(count > getMaxOnceSubmits() ? getMaxOnceSubmits() : count);
+	protected List<MoForwardPacket> takeQueuedSubmits(String serviceNumber, int count) {
+		return (List<MoForwardPacket>) this.batchPool.takeObjects(count > getMaxOnceSubmits() ? getMaxOnceSubmits() : count, serviceNumber);
 	}
 
 	@Override
-	protected int testQueuedSubmits() {
-		return this.batchPool.countPooling(getMaxOnceSubmits());
+	protected int testQueuedSubmits(String serviceNumber) {
+		return this.batchPool.countPooling(getMaxOnceSubmits(), serviceNumber);
 	}
 
 }
