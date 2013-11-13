@@ -211,6 +211,10 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 	@SuppressWarnings("unchecked")
 	@Override
 	protected void handleDisConnect(Request request, Response response) {
+		if (Log.isDebugEnabled()) {
+			Log.debug("传输上下文已断开!");
+		}
+
 		if (CmppUtils.testRequestBinded(request) && CmppUtils.testRequestSubmiting(request)) {
 			int submitted_result_count = CmppUtils.extractRequestSubmittedRepliedCount(request);
 			int submitted_count = CmppUtils.extractRequestSubmittedCount(request);
@@ -263,16 +267,21 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 		int flowTotal = CmppUtils.extractRequestFlowTotal(request);
 		// 当前时间
 		long currentTimeMilles = System.currentTimeMillis();
-		if (Log.isDebugEnabled()) {
-			Log.info(String.format("time=%d, interal=%d, total=%d ", currentTimeMilles,
-					(currentTimeMilles - flowLastTime), flowTotal));
-		}
+
 		// 如果间隔小于1秒和发送总数大于
 		if ((currentTimeMilles - flowLastTime) < 1000 && flowTotal >= this.maxSubmitPerSecond) {
+			if (Log.isDebugEnabled()) {
+				Log.debug(String.format("流量超限(%d秒内已发%d条)，最大允许每次秒发送%d条", (currentTimeMilles - flowLastTime) / 1000,
+						flowTotal, this.maxSubmitPerSecond));
+			}
 			return;
 		} else if ((currentTimeMilles - flowLastTime) >= 1000) {
 			flowLastTime = currentTimeMilles;
 			flowTotal = 0;
+		}
+		
+		if (Log.isDebugEnabled()) {
+			Log.debug("准备向服务器提交短信包...");
 		}
 
 		String sp_number = Integer.toString(this.spNumber);
@@ -283,7 +292,10 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 		} catch (Throwable e) {
 			Log.warn("从待发队列中获取短信失败: " + e.getMessage(), e);
 		}
-		if (takedPostSubmits != null) {
+		if (!ListUtils.isEmpty(takedPostSubmits)) {
+			if (Log.isDebugEnabled()) {
+				Log.debug(String.format("从发送缓冲队列中获取%s条短信进行发送...", takedPostSubmits.size()));
+			}
 			for (Submit sb : takedPostSubmits) {
 				sb.spId = "" + this.enterpriseId;
 				if (!StringUtils.hasText(sb.sourceId) || !sb.sourceId.startsWith(sp_number)) {
@@ -296,6 +308,9 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 				}
 				sb.sequenceId = CmppUtils.generateRequestSequence(request);
 				sb.protocolVersion = this.protocolVersion;
+				if (Log.isDebugEnabled()) {
+					Log.debug(String.format("正在执行第%d条短信提交前处理...", submitted + 1));
+				}
 				int transmit_listener_size = ListUtils.size(transmitListener);
 				if (transmit_listener_size > 0) {
 					TransmitEvent event = new TransmitEvent(sb);
@@ -308,9 +323,18 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 						}
 					}
 				}
+				if (Log.isDebugEnabled()) {
+					Log.debug(String.format("已完成第%d条短信提交前处理!", submitted + 1));
+				}
 				try {
+					if (Log.isDebugEnabled()) {
+						Log.debug(String.format("正在提交第%d条短信...", submitted + 1));
+					}
 					CmppUtils.renderDataPacket(request, response, sb);
 					response.flushBuffer();
+					if (Log.isDebugEnabled()) {
+						Log.debug(String.format("已提交第%d条短信!", submitted + 1));
+					}
 					sb.submitCount++;
 					CmppUtils.updateSubmitteds(request, takedPostSubmits, submitted + 1);
 					flowTotal++;
@@ -344,6 +368,9 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 					throw e;
 				}
 				submitted++;
+				if (Log.isDebugEnabled()) {
+					Log.debug(String.format("执行第%d条短信的提交后处理...", submitted));
+				}
 				transmit_listener_size = ListUtils.size(transmitListener);
 				if (transmit_listener_size > 0) {
 					TransmitEvent event = new TransmitEvent(sb);
@@ -356,7 +383,17 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 						}
 					}
 				}
+				if (Log.isDebugEnabled()) {
+					Log.debug(String.format("完成第%d条短信的提交后处理...", submitted));
+				}
 			}
+			
+			if (Log.isDebugEnabled()) {
+				Log.debug(String.format("已提交%d条短信至网关", takedPostSubmits.size()));
+			}
+			
+		} else if (Log.isDebugEnabled()) {
+			Log.debug("短信发送缓冲队列为空!");
 		}
 	}
 
@@ -409,6 +446,9 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 		login.sequenceId = CmppUtils.generateRequestSequence(request);
 		CmppUtils.renderDataPacket(request, response, login);
 		response.flushBuffer();
+		if (Log.isDebugEnabled()) {
+			Log.debug("已提交登陆请求...");
+		}
 	}
 
 	@SuppressWarnings("unchecked")
@@ -424,6 +464,9 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 			List<Submit> posts = (List<Submit>) CmppUtils.extractRequestSubmitteds(request);
 			CmppUtils.updateSubmittedRepliedCount(request, last_pare_submit_index + 1);
 			Submit submitted = posts.get(last_pare_submit_index);
+			if (Log.isDebugEnabled()) {
+				Log.debug(String.format("收到短信发送应答(%d/%d)", last_pare_submit_index, posts.size()));
+			}
 			if (res.result != 0) {
 				Log.warn(String.format("发送包:\n%s\n收到错误应答码: \n%s\n", submitted.toString(), res.toString()));
 			}
@@ -474,6 +517,9 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 
 	@Override
 	protected void doBindResponse(Request request, Response response) throws IOException {
+		if (Log.isDebugEnabled()) {
+			Log.debug("已获得登陆请求应答!");
+		}
 		CmppUtils.setupRequestBinding(request, false);
 		ConnectResponse res = (ConnectResponse) CmppUtils.extractRequestPacket(request);
 		if (res.status == 0) {
@@ -484,6 +530,7 @@ public abstract class AbstractCmppSPTransmitHandler extends AbstractCmppContextS
 				doPostSubmit(request, response, wellbeTakeCount);
 			}
 		} else {
+			Log.warn(String.format("连接绑定请求应答码(%d)不正确，连接断开！", res.status));
 			throw new ConnectException("登录错误, 请检查用户或密码错误以及客户IP是否正确, 应答: " + res.toString());
 		}
 	}

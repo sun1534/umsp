@@ -139,6 +139,26 @@ public final class Client extends AbstractOriginHandler implements Attributes, O
 	public void setAutoReConnect(boolean autoReConnect) {
 		this._autoReConnect = autoReConnect;
 	}
+	
+	public int getConnectedCount() {
+		int connectedCount = 0;
+		for (Connector connector : getConnectors()) {
+			if (connector instanceof PacketClientConnector) {
+				connectedCount += ((PacketClientConnector) connector).getConnectedCount();
+			}
+		}
+		return connectedCount;
+	}
+	
+	public boolean isConnected() {
+		int connectedCount = 0;
+		for (Connector connector : getConnectors()) {
+			if (connector instanceof PacketClientConnector) {
+				connectedCount += ((PacketClientConnector) connector).getConnectedCount();
+			}
+		}
+		return connectedCount > 0;
+	}
 
 	protected void updateConnectorParamers() {
 		if (getConnectors() != null) {
@@ -175,7 +195,7 @@ public final class Client extends AbstractOriginHandler implements Attributes, O
 			}
 		}
 	}
-
+	
 	@Override
 	protected void doStart() throws Exception {
 		if (getConnectors() == null) {
@@ -184,7 +204,7 @@ public final class Client extends AbstractOriginHandler implements Attributes, O
 		updateConnectorParamers();
 		super.doStart();
 		if (this.getThreadPool() instanceof QueuedThreadPool) {
-			((QueuedThreadPool) this.getThreadPool()).setMaxThreads(getMaxConnection() + 1);
+			((QueuedThreadPool) this.getThreadPool()).setMaxThreads(getMaxConnection() + 5);
 			if (StringUtils.hasText(getProtocol())) {
 				((QueuedThreadPool) this.getThreadPool()).setName(getProtocol());
 			}

@@ -635,6 +635,7 @@ public abstract class AbstractConnector extends AbstractBuffers implements Conne
 						}
 					}
 					_connection.handle();
+					Thread.yield();
 				}
 			} catch (EofException e) {
 				try {

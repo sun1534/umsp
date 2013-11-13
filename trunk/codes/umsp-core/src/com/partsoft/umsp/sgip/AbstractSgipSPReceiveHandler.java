@@ -11,14 +11,13 @@ import com.partsoft.utils.CompareUtils;
 import com.partsoft.utils.StringUtils;
 
 public abstract class AbstractSgipSPReceiveHandler extends AbstractSgipContextSPHandler {
-	
+
 	protected int maxRequestIdleTime = 1000 * 60;
-	
+
 	public AbstractSgipSPReceiveHandler() {
-		
+
 	}
-	
-	
+
 	@Override
 	protected void handleTimeout(Request request, Response response) throws IOException {
 		long request_idle_time = System.currentTimeMillis() - request.getRequestTimestamp();
@@ -30,13 +29,12 @@ public abstract class AbstractSgipSPReceiveHandler extends AbstractSgipContextSP
 			super.handleTimeout(request, response);
 		}
 	}
-	
+
 	@Override
-	protected void doBindRequest(Request request, Response response)
-			throws IOException {
+	protected void doBindRequest(Request request, Response response) throws IOException {
 		SgipUtils.setupRequestBinding(request, true);
 	}
-	
+
 	@Override
 	protected void doBind(Request request, Response response) throws IOException {
 		SgipUtils.setupRequestBinding(request, false);
@@ -45,10 +43,20 @@ public abstract class AbstractSgipSPReceiveHandler extends AbstractSgipContextSP
 		SgipUtils.copySerialNumber(bind_resp, bind);
 
 		bind_resp.result = BindResults.SUCCESS;
-		if (limitClientIp && StringUtils.hasText(smgHost)
-				&& !CompareUtils.nullSafeEquals(smgHost, request.getRemoteHost())) {
-			bind_resp.result = BindResults.IPERROR;
+		if (limitClientIp && StringUtils.hasText(smgHost)) {
+			if (!(CompareUtils.nullSafeEquals(smgHost, request.getRemoteAddr()) || CompareUtils.nullSafeEquals(smgHost,
+					request.getRemoteHost()))) {
+				bind_resp.result = BindResults.IPERROR;
+				Log.warn(String.format("网关(%s)转发请求绑定不被允许", request.getRemoteAddr()));
+			}
 		}
+
+		if (!(CompareUtils.nullSafeEquals(bind.user, this.account) && CompareUtils.nullSafeEquals(bind.pwd,
+				this.password))) {
+			bind_resp.result = BindResults.ERROR;
+			Log.warn(String.format("网关(%s)转发请求绑定用户名(%s)密码(%s)错误", request.getRemoteAddr(), bind.user, bind.pwd));
+		}
+
 		SgipUtils.renderDataPacket(request, response, bind_resp);
 		if (bind_resp.result == BindResults.SUCCESS) {
 			SgipUtils.setupRequestBinded(request, true);
@@ -57,7 +65,7 @@ public abstract class AbstractSgipSPReceiveHandler extends AbstractSgipContextSP
 			response.finalBuffer();
 		}
 	}
-	
+
 	@Override
 	protected void doDeliver(Request request, Response response) throws IOException {
 		super.doDeliver(request, response);
@@ -78,11 +86,11 @@ public abstract class AbstractSgipSPReceiveHandler extends AbstractSgipContextSP
 		SgipUtils.renderDataPacket(request, response, resp);
 		response.flushBuffer();
 	}
-	
+
 	protected abstract void doReceivedMessage(Deliver deliver);
-	
+
 	protected abstract void doReceivedReport(Report report);
-	
+
 	@Override
 	protected void doReport(Request request, Response response) throws IOException {
 		super.doReport(request, response);
@@ -103,10 +111,10 @@ public abstract class AbstractSgipSPReceiveHandler extends AbstractSgipContextSP
 		SgipUtils.renderDataPacket(request, response, resp);
 		response.flushBuffer();
 	}
-	
+
 	@Override
 	protected void doSubmit(Request request, Response response) throws IOException {
 		throw new PacketException("not support");
 	}
-	
+
 }

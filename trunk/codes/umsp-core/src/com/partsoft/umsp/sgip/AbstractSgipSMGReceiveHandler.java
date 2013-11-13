@@ -8,7 +8,7 @@ import com.partsoft.umsp.Constants.MessageCodes;
 import com.partsoft.umsp.PhoneNumberValidator;
 import com.partsoft.umsp.Request;
 import com.partsoft.umsp.Response;
-import com.partsoft.umsp.cmpp.Constants.Commands;
+import com.partsoft.umsp.sgip.Constants.Commands;
 import com.partsoft.umsp.handler.TransmitListener;
 import com.partsoft.umsp.io.ByteArrayBuffer;
 import com.partsoft.umsp.log.Log;
@@ -98,7 +98,7 @@ public abstract class AbstractSgipSMGReceiveHandler extends AbstractSgipContextH
 		int requestMaxSubmitsPerSecond = this.maxSubmitPerSecond;
 		
 		Bind bind = (Bind) SgipUtils.extractRequestPacket(request);
-		BindResponse resp = (BindResponse) context_sgip_packet_maps.get(Commands.CMPP_CONNECT_RESP).clone();
+		BindResponse resp = (BindResponse) context_sgip_packet_maps.get(Commands.BIND_RESPONSE).clone();
 		try {
 			resp = buildConnectResponse(resp, request.getRemoteAddr(), bind.user, bind.pwd,
 					bind.timestamp);
@@ -236,7 +236,7 @@ public abstract class AbstractSgipSMGReceiveHandler extends AbstractSgipContextH
 		}
 		
 		Submit submit = (Submit) SgipUtils.extractRequestPacket(request);
-		SubmitResponse resp = (SubmitResponse) this.context_sgip_packet_maps.get(Commands.CMPP_SUBMIT_RESP).clone();
+		SubmitResponse resp = (SubmitResponse) this.context_sgip_packet_maps.get(Commands.SUBMIT_RESPONSE).clone();
 		
 		resp.node_id = this.gatewayId;
 		resp.timestamp = CalendarUtils.getTimestampInYearDuring(submit.createTimeMillis);

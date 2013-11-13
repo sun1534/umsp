@@ -318,12 +318,13 @@ public abstract class AbstractSmgpSMGContextHandler extends AbstractSmgpContextH
 		int flowTotal = SmgpUtils.extractRequestFlowTotal(request);
 		// 当前时间
 		long currentTimeMilles = System.currentTimeMillis();
-		if (Log.isDebugEnabled()) {
-			Log.info(String.format("time=%d, interal=%d, total=%d ", currentTimeMilles,
-					(currentTimeMilles - flowLastTime), flowTotal));
-		}
+
 		// 如果间隔小于1秒和发送总数大于
 		if ((currentTimeMilles - flowLastTime) < 1000 && flowTotal >= currentMaxDeliverPerSecond) {
+			if (Log.isDebugEnabled()) {
+				Log.debug(String.format("流量超限(%d秒内已发%d条)，最大允许每次秒发送%d条", (currentTimeMilles - flowLastTime) / 1000,
+						flowTotal, this.maxSubmitPerSecond));
+			}
 			return;
 		} else if ((currentTimeMilles - flowLastTime) >= 1000) {
 			flowLastTime = currentTimeMilles;
@@ -365,6 +366,7 @@ public abstract class AbstractSmgpSMGContextHandler extends AbstractSmgpContextH
 				try {
 					SmgpUtils.renderDataPacket(request, response, sb);
 					response.flushBuffer();
+					sb.submitCount++;
 					SmgpUtils.updateSubmitteds(request, takedPostSubmits, submitted + 1);
 					flowTotal++;
 					SmgpUtils.updateRequestFlowTotal(request, flowLastTime, flowTotal);

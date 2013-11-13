@@ -275,12 +275,13 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 		int flowTotal = SmgpUtils.extractRequestFlowTotal(request);
 		// 当前时间
 		long currentTimeMilles = System.currentTimeMillis();
-		if (Log.isDebugEnabled()) {
-			Log.info(String.format("time=%d, interal=%d, total=%d ", currentTimeMilles,
-					(currentTimeMilles - flowLastTime), flowTotal));
-		}
+
 		// 如果间隔小于1秒和发送总数大于
 		if ((currentTimeMilles - flowLastTime) < 1000 && flowTotal >= this.maxSubmitPerSecond) {
+			if (Log.isDebugEnabled()) {
+				Log.debug(String.format("流量超限(%d秒内已发%d条)，最大允许每次秒发送%d条", (currentTimeMilles - flowLastTime) / 1000,
+						flowTotal, this.maxSubmitPerSecond));
+			}
 			return;
 		} else if ((currentTimeMilles - flowLastTime) >= 1000) {
 			flowLastTime = currentTimeMilles;
@@ -302,8 +303,8 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 				sb.SrcTermID = sp_numer;
 			}
 			if (sb.submitCount >= this.packetSubmitRetryTimes) {
-				Log.warn(String.format("忽略已重发%d次给用户(%s)的短信:\n%s\n", sb.submitCount,
-						sb.getUserNumbersTrimCNPrefix(), sb.toString()));
+				Log.warn(String.format("忽略已重发%d次给用户(%s)的短信:\n%s\n", sb.submitCount, sb.getUserNumbersTrimCNPrefix(),
+						sb.toString()));
 				continue;
 			}
 			sb.MsgType = 6;
@@ -324,6 +325,7 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 			try {
 				SmgpUtils.renderDataPacket(request, response, sb);
 				response.flushBuffer();
+				sb.submitCount++;
 				SmgpUtils.updateSubmitteds(request, takedPostSubmits, submitted + 1);
 				flowTotal++;
 				SmgpUtils.updateRequestFlowTotal(request, flowLastTime, flowTotal);
@@ -434,7 +436,7 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 			if (res.Status != 0) {
 				Log.warn(String.format("发送包:\n%s\n收到错误应答码: \n%s\n", submitted.toString(), res.toString()));
 			}
-			
+
 			int transmit_listener_size = ListUtils.size(transmitListener);
 			if (transmit_listener_size > 0) {
 				TransmitEvent event = new TransmitEvent(new Object[] { submitted, res });
@@ -489,6 +491,7 @@ public abstract class AbstractSmgpSPTransmitHandler extends AbstractSmgpContextS
 				doPostSubmit(request, response, wellbeTakeCount);
 			}
 		} else {
+			Log.warn(String.format("连接绑定请求应答码(%d)不正确，连接断开！", res.Status));
 			throw new LoginException("登录错误, 请检查用户或密码错误以及客户IP是否正确, 应答: " + res.toString());
 		}
 	}

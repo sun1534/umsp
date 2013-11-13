@@ -118,6 +118,14 @@ public class PacketClientConnector extends AbstractConnector {
 			_dispatchedConnections++;
 		}
 	}
+	
+	public int getConnectedCount() {
+		return _dispatchedConnections;
+	}
+	
+	public boolean isConnected() {
+		return _dispatchedConnections > 0;
+	}
 
 	protected Buffer newBuffer(int size) {
 		return new ByteArrayBuffer(size);
@@ -148,6 +156,7 @@ public class PacketClientConnector extends AbstractConnector {
 		synchronized (this) {
 			_dispatchedThreads = new Thread[1];
 			Assert.isTrue(getThreadPool().dispatch(new Connector(0)));
+			Thread.yield();
 		}
 	}
 
